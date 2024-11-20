@@ -1,0 +1,3 @@
+sfdx sgd:source:delta --from origin/develop --output .
+
+sf project deploy start --target-org {ORG] --manifest package\package.xml --post-destructive-changes destructiveChanges\destructiveChanges.xml  --ignore-conflicts --ignore-warnings --dry-run
