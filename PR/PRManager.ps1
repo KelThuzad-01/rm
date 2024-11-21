@@ -1,6 +1,6 @@
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
-$prNumbersList = @()  # Reemplaza con los números reales de las PRs ej: "0001", "0004", "4462"
+$prNumbersList = @("8797", "8818","6825", "7042", "6799", "7014", "8881", "8905","8614", "8844", "8879")  # Reemplaza con los números reales de las PRs ej: "0001", "0004", "4462"
 $currentBranch = git rev-parse --abbrev-ref HEAD 2>&1
 
 function PreCherryPickActions{
@@ -33,6 +33,7 @@ function PreCommitActions{
     Get-Content $filePath | Sort-Object -Unique | Set-Content $filePath
     git add $filePath
     Write-Host "Removed duplicated lines from $filePath"
+    ShowDiff
 }
 
 function AskPushBranch{
