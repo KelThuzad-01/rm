@@ -1,4 +1,4 @@
-$prNumbersList = @("8892", "8819", "8885", "8893", "8836")  # Reemplaza con los números reales de las PRs ej: "0001", "0004", "4462"
+$prNumbersList = @()  # Reemplaza con los números reales de las PRs ej: "0001", "0004", "4462"
 $currentBranch = git rev-parse --abbrev-ref HEAD 2>&1
 
 function PreCherryPickActions{
@@ -40,6 +40,7 @@ function AskPushBranch{
         git push --set-upstream origin $currentBranch
         Start-Process "https://bitbucket.org/iberdrola-clientes/iberdrola-sfdx/pull-requests/new?source=$currentBranch&t=1"
     }
+    Write-Host "Comparte la PR con los equipos para su revisión" -ForegroundColor Red
     Exit
 }
 
