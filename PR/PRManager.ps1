@@ -1,3 +1,5 @@
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+
 $prNumbersList = @()  # Reemplaza con los números reales de las PRs ej: "0001", "0004", "4462"
 $currentBranch = git rev-parse --abbrev-ref HEAD 2>&1
 
