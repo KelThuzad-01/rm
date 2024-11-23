@@ -72,6 +72,18 @@ try {
             console.log('Running delete script...');
             const deleteOutput = execSync(deleteScript, { encoding: 'utf-8' });
             console.log('Delete script output:\n', deleteOutput);
+
+            const fieldName = fieldMatch[1];
+            console.log('Extracted field:', fieldName);
+
+            // Lanzar el script de eliminación con el campo como parámetro
+            deleteScript = deleteScriptTemplate
+                .replace('${profilePath}', profilePath)
+                .replace('${fieldName}', fieldName);
+
+            console.log('Running delete script...');
+            deleteOutput = execSync(deleteScript, { encoding: 'utf-8' });
+            console.log('Delete script output:\n', deleteOutput);
         }else {
             console.log('No further action required.');
             fieldsFound = false; // Salir del bucle
