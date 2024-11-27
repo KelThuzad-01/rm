@@ -12,7 +12,7 @@ WORKSPACE = "iberdrola-clientes"  # Nombre de tu espacio de trabajo
 REPO_SLUG = "iberdrola-sfdx"  # Nombre del repositorio
 BITBUCKET_USERNAME = "alejandroberdun1"  # Tu nombre de usuario en Bitbucket
 BITBUCKET_PASSWORD = "ATBBkWxmrgHJrjFDWQegmVZyKZA3BA6D12E4"  # Tu contraseña (o token de aplicación)
-PULL_REQUESTS = [8803]  # Lista de IDs de las Pull Requests
+PULL_REQUESTS = [8942]  # Lista de IDs de las Pull Requests
 
 
 def run_command(command, cwd=None, ignore_errors=False):
@@ -25,6 +25,66 @@ def run_command(command, cwd=None, ignore_errors=False):
             print(f"Error ejecutando {command}:\n{result.stderr}")
             raise Exception(result.stderr)
     return result.stdout.strip()
+
+def export_diff_to_file(repo, base_commit, target_commit, output_file, cached=False):
+    """
+    Exporta las diferencias de un rango de commits o cambios locales a un archivo.
+    :param repo: Objeto Repo de Git.
+    :param base_commit: Commit base para el diff (e.g., "commit1").
+    :param target_commit: Commit de comparación (e.g., "commit2").
+    :param output_file: Ruta del archivo donde guardar el diff.
+    :param cached: Si es True, exporta las diferencias en el área de preparación (--cached).
+    """
+    try:
+        if cached:
+            # Differences en el área de preparación
+            diff_output = repo.git.diff("--cached", "--unified=0", "--")
+        else:
+            # Diferencias entre dos commits
+            diff_output = repo.git.diff(f"{base_commit}", f"{target_commit}", "--unified=0", "--")
+        
+        with open(output_file, "w", encoding="utf-8") as f:
+            f.write(diff_output)
+        print(f"Diferencias exportadas a {output_file}.")
+    except Exception as e:
+        print(f"Error exportando diferencias: {e}")
+
+def compare_diff_files(original_diff_file, local_diff_file):
+    """
+    Compara las diferencias en dos archivos y reporta discrepancias.
+    :param original_diff_file: Ruta al archivo con diferencias originales.
+    :param local_diff_file: Ruta al archivo con diferencias locales.
+    """
+    discrepancies_found = False
+
+    with open(original_diff_file, "r", encoding="utf-8") as original_file:
+        original_lines = original_file.readlines()
+
+    with open(local_diff_file, "r", encoding="utf-8") as local_file:
+        local_lines = local_file.readlines()
+
+    # Comparar línea por línea
+    original_set = set(original_lines)
+    local_set = set(local_lines)
+
+    extra_in_local = local_set - original_set
+    missing_in_local = original_set - local_set
+
+    if extra_in_local:
+        discrepancies_found = True
+        print("Líneas adicionales en los cambios locales:")
+        for line in sorted(extra_in_local):
+            print(f"  + {line.strip()}")
+
+    if missing_in_local:
+        discrepancies_found = True
+        print("Líneas faltantes en los cambios locales:")
+        for line in sorted(missing_in_local):
+            print(f"  - {line.strip()}")
+
+    if not discrepancies_found:
+        print("No se encontraron discrepancias. Las diferencias coinciden exactamente.")
+
 
 def normalizar_linea(linea):
     """Normalizar una línea para ignorar diferencias de espacios, saltos de línea, y orden."""
@@ -161,17 +221,22 @@ def realizar_cherry_pick_y_validar(repo, commit_id):
         print("Resolviendo conflictos si los hay...")
         input("Presiona ENTER una vez que hayas resuelto los conflictos y guardado los cambios.")
 
-        print("Obteniendo diferencias originales del commit...")
-        original_diffs = obtener_diffs(repo, rango=f"{commit_id}^1 {commit_id}")
+        # Exportar diffs
+        original_diff_file = "original_diff.txt"
+        local_diff_file = "local_diff.txt"
 
-        print("Obteniendo diferencias locales...")
-        local_diffs = obtener_diffs(repo, cached=True)
+        print("Exportando diferencias originales...")
+        export_diff_to_file(repo, f"{commit_id}^1", commit_id, original_diff_file)
 
-        if not comparar_diferencias(original_diffs, local_diffs):
-            raise Exception("Discrepancias detectadas.")
+        print("Exportando diferencias locales...")
+        export_diff_to_file(repo, None, None, local_diff_file, cached=True)
+
+        # Comparar los archivos
+        print("Comparando diferencias entre original y local...")
+        compare_diff_files(original_diff_file, local_diff_file)
+
     except Exception as e:
-        print(f"Error durante el cherry-pick y validación: {e}")
-        raise
+        print(f"Error test {e}")
 
 def main():
     repo = Repo(REPO_PATH)
