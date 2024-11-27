@@ -1,6 +1,6 @@
+#revertir último commit git reset--hard HEAD~1
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-
-$prNumbersList = @("8797", "8818","6825", "7042", "6799", "7014", "8881", "8905","8614", "8844", "8879")  # Reemplaza con los números reales de las PRs ej: "0001", "0004", "4462"
+$prNumbersList = @("8952", "8958", "8965", "8967", "8968", "7985")  # Reemplaza con los números reales de las PRs ej: "0001", "0004", "4462"
 $currentBranch = git rev-parse --abbrev-ref HEAD 2>&1
 
 function PreCherryPickActions{
@@ -66,7 +66,9 @@ function ShowMenu{
 
 foreach ($prNumber in $prNumbersList) {
     PreCherryPickActions
-    git log --all --grep="#$prNumber" -n 1 --format="%H" | ForEach-Object { 
+    git log --all --grep="#$prNumber" --format="%H" | 
+    Select-Object -Last 1 | 
+    ForEach-Object {
         git cherry-pick -x -n -m 1 $_
         if ($?) { code -r . }
     }

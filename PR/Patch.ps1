@@ -1,21 +1,4 @@
-# Lista de PRs en un array
-$prNumbersList = @("8852") # Agrega aquí los números de PR que quieres procesar
-
-function Get-CurrentBranch {
-    try {
-        # Obtener la rama actual usando git rev-parse
-        $CurrentBranch = git rev-parse --abbrev-ref HEAD
-        if (-not $CurrentBranch) {
-            throw "No se pudo obtener la rama actual. ¿Estás en un repositorio Git válido?"
-        }
-        Write-Host "Actualmente en la rama: $CurrentBranch" -ForegroundColor Cyan
-        return $CurrentBranch.Trim()
-    }
-    catch {
-        Write-Error "Error al obtener la rama actual: $_"
-        exit 1
-    }
-}
+$prNumbersList = @("8317") # Agrega aquí los números de PR que quieres procesar
 
 function Get-MergeCommitHash {
     param (
@@ -24,7 +7,7 @@ function Get-MergeCommitHash {
     try {
         # Buscar el commit hash del PR usando git log
         Write-Host "Obteniendo commit hash para PR #$PRNumber..." -ForegroundColor Green
-        $CommitHash = git log --all --grep="#$PRNumber" -n 1 --format="%H"
+        $CommitHash = git log --all --grep="#$PRNumber" --format="%H" | Select-Object -Last 1
         
         if (-not $CommitHash) {
             Write-Warning "No se encontró un commit de merge para PR #$PRNumber."
@@ -54,21 +37,16 @@ function Apply-Patch {
 
         # Aplicar el parche a la rama actual
         Write-Host "Aplicando el parche $PatchFilePath a la rama actual..." -ForegroundColor Green
-        git apply $PatchFilePath
-
-        Write-Host "El parche se aplicó correctamente a la rama actual." -ForegroundColor Cyan
+        git apply --3way --ignore-space-change --ignore-whitespace $PatchFilePath
 
         # Eliminar el parche después de aplicarlo
-        Remove-Item -Path $PatchFilePath -Force
+        #Remove-Item -Path $PatchFilePath -Force
     }
     catch {
         # Concatenamos manualmente el mensaje para evitar problemas con ":"
         Write-Error ("Error al aplicar el parche para el commit " + $MergeCommit + ": " + $_)
     }
 }
-
-# Obtener la rama actual
-$CurrentBranch = Get-CurrentBranch
 
 # Procesar cada PR de la lista
 foreach ($PRNumber in $prNumbersList) {
