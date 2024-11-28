@@ -5,15 +5,7 @@ from git import Repo
 
 # Configuración principal
 REPO_PATH = "C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx"  # Cambia por la ruta local de tu repositorio
-REMOTE_NAME = "origin"  # Cambiar si el remoto no es "origin"
-BRANCH_DESTINO = "release/PROD_20241202"  # Rama donde aplicar los cherry-picks
-BITBUCKET_API_URL = "https://api.bitbucket.org/2.0"
-WORKSPACE = "iberdrola-clientes"  # Nombre de tu espacio de trabajo
-REPO_SLUG = "iberdrola-sfdx"  # Nombre del repositorio
-BITBUCKET_USERNAME = "alejandroberdun1"  # Tu nombre de usuario en Bitbucket
-BITBUCKET_PASSWORD = "ATBBkWxmrgHJrjFDWQegmVZyKZA3BA6D12E4"  # Tu contraseña (o token de aplicación)
-PULL_REQUESTS = [8942]  # Lista de IDs de las Pull Requests
-
+PULL_REQUESTS = [8140]  # Lista de IDs de las Pull Requests
 
 def run_command(command, cwd=None, ignore_errors=False):
     """Ejecutar un comando en la terminal."""
@@ -211,6 +203,79 @@ def comparar_diferencias(original_diffs, local_diffs):
     print("\nTodas las diferencias coinciden.")
     return True
 
+def compare_diff_files_with_context(original_diff_file, local_diff_file):
+    """
+    Compara dos archivos de diferencias y reporta las discrepancias, indicando el archivo donde ocurren.
+    :param original_diff_file: Archivo con las diferencias originales (commit).
+    :param local_diff_file: Archivo con las diferencias locales (--cached).
+    """
+    try:
+        # Leer las diferencias de los archivos
+        with open(original_diff_file, "r", encoding="utf-8") as f:
+            original_diff = f.readlines()
+        with open(local_diff_file, "r", encoding="utf-8") as f:
+            local_diff = f.readlines()
+
+        # Diccionario para rastrear discrepancias por archivo
+        discrepancies_by_file = {}
+
+        # Variables temporales para almacenar el contexto
+        current_file = None
+
+        # Analizar diferencias originales
+        for line in original_diff:
+            if line.startswith("diff --git"):
+                # Extraer el nombre del archivo
+                parts = line.split(" ")
+                current_file = parts[2][2:]  # Quitar el prefijo "b/"
+                discrepancies_by_file[current_file] = {"original": set(), "local": set()}
+            elif line.startswith("+") and not line.startswith("+++"):
+                discrepancies_by_file[current_file]["original"].add(line[1:].strip())
+            elif line.startswith("-") and not line.startswith("---"):
+                discrepancies_by_file[current_file]["original"].add(line[1:].strip())
+
+        # Analizar diferencias locales
+        for line in local_diff:
+            if line.startswith("diff --git"):
+                # Extraer el nombre del archivo
+                parts = line.split(" ")
+                current_file = parts[2][2:]  # Quitar el prefijo "b/"
+                if current_file not in discrepancies_by_file:
+                    discrepancies_by_file[current_file] = {"original": set(), "local": set()}
+            elif line.startswith("+") and not line.startswith("+++"):
+                discrepancies_by_file[current_file]["local"].add(line[1:].strip())
+            elif line.startswith("-") and not line.startswith("---"):
+                discrepancies_by_file[current_file]["local"].add(line[1:].strip())
+
+        # Comparar las diferencias
+        discrepancies_found = False
+        for file, diffs in discrepancies_by_file.items():
+            original_lines = diffs["original"]
+            local_lines = diffs["local"]
+
+            extra_lines = local_lines - original_lines
+            missing_lines = original_lines - local_lines
+
+            if extra_lines or missing_lines:
+                discrepancies_found = True
+                print(f"\n***************************************")
+                print(f"\nDiscrepancias detectadas en el archivo: {file}")
+                if extra_lines:
+                    print("  Líneas adicionales en local:")
+                    for line in sorted(extra_lines):
+                        print(f"    + {line}")
+                if missing_lines:
+                    print("  Líneas faltantes en local:")
+                    for line in sorted(missing_lines):
+                        print(f"    - {line}")
+
+        if not discrepancies_found:
+            print("No se encontraron discrepancias entre los cambios originales y los locales.")
+
+    except Exception as e:
+        print(f"Error comparando los archivos de diferencias: {e}")
+
+
 def realizar_cherry_pick_y_validar(repo, commit_id):
     """Realizar el cherry-pick y validar los cambios."""
     try:
@@ -233,7 +298,7 @@ def realizar_cherry_pick_y_validar(repo, commit_id):
 
         # Comparar los archivos
         print("Comparando diferencias entre original y local...")
-        compare_diff_files(original_diff_file, local_diff_file)
+        compare_diff_files_with_context(original_diff_file, local_diff_file)
 
     except Exception as e:
         print(f"Error test {e}")
