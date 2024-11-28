@@ -40,6 +40,15 @@ def export_diff_to_file(repo, base_commit, target_commit, output_file, cached=Fa
         print(f"Diferencias exportadas a {output_file}.")
     except Exception as e:
         print(f"Error exportando diferencias: {e}")
+def abrir_pull_request_en_navegador(pr_id):
+    """
+    Abrir la Pull Request en el navegador.
+    
+    :param pr_id: ID de la Pull Request.
+    """
+    url = f"https://bitbucket.org/{WORKSPACE}/{REPO_SLUG}/pull-requests/{pr_id}"
+    print(f"Abriendo la Pull Request #{pr_id} en el navegador: {url}")
+    webbrowser.open(url)
 
 def compare_diff_files(original_diff_file, local_diff_file):
     """
@@ -308,6 +317,7 @@ def main():
     for pr_id in PULL_REQUESTS:
         try:
             print(f"Procesando PR #{pr_id}...")
+            abrir_pull_request_en_navegador(pr_id)
             command = f'git log --all --grep="#{pr_id}" --format="%H"'
             result = run_command(command, cwd=REPO_PATH)
             commit_ids = result.splitlines()
