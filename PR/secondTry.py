@@ -1,11 +1,12 @@
 import os
 import subprocess
 import webbrowser
+import re
 from git import Repo
 
 # Configuración principal
 REPO_PATH = "C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx"  # Cambia por la ruta local de tu repositorio
-PULL_REQUESTS = [8140]  # Lista de IDs de las Pull Requests
+PULL_REQUESTS = [8939, 8976, 8943]  # Lista de IDs de las Pull Requests
 
 def run_command(command, cwd=None, ignore_errors=False):
     """Ejecutar un comando en la terminal."""
@@ -18,35 +19,64 @@ def run_command(command, cwd=None, ignore_errors=False):
             raise Exception(result.stderr)
     return result.stdout.strip()
 
-def export_diff_to_file(repo, base_commit, target_commit, output_file, cached=False):
+def export_diff_to_file(repo, commit_base, commit_to, output_file, cached=False):
     """
-    Exporta las diferencias de un rango de commits o cambios locales a un archivo.
-    :param repo: Objeto Repo de Git.
-    :param base_commit: Commit base para el diff (e.g., "commit1").
-    :param target_commit: Commit de comparación (e.g., "commit2").
-    :param output_file: Ruta del archivo donde guardar el diff.
-    :param cached: Si es True, exporta las diferencias en el área de preparación (--cached).
+    Exportar el resultado de git diff a un archivo.
     """
     try:
         if cached:
-            # Differences en el área de preparación
-            diff_output = repo.git.diff("--cached", "--unified=0", "--")
+            command = f"git diff --cached --unified=0 > {output_file}"
+        elif commit_base and commit_to:
+            # Asegurar que los commits estén correctamente formateados
+            command = f"git diff --unified=0 \"{commit_base}\" \"{commit_to}\" > \"{output_file}\""
         else:
-            # Diferencias entre dos commits
-            diff_output = repo.git.diff(f"{base_commit}", f"{target_commit}", "--unified=0", "--")
+            raise ValueError("Se requiere commit_base y commit_to para el diff no cached.")
+
+        # Registrar el comando antes de ejecutarlo
+        print(f"Ejecutando comando: {command}")
         
-        with open(output_file, "w", encoding="utf-8") as f:
-            f.write(diff_output)
+        # Ejecutar el comando
+        result = subprocess.run(
+            command, cwd=REPO_PATH, shell=True, capture_output=True, text=True
+        )
+
+        # Verificar errores en la ejecución
+        if result.returncode != 0:
+            print(f"Error ejecutando el comando: {result.stderr.strip()}")
+            raise Exception(f"Error exportando diferencias: {result.stderr.strip()}")
+
+        # Confirmar que el archivo fue generado
+        if not os.path.exists(output_file) or os.stat(output_file).st_size == 0:
+            raise Exception(f"El archivo {output_file} no se generó o está vacío.")
+
         print(f"Diferencias exportadas a {output_file}.")
     except Exception as e:
         print(f"Error exportando diferencias: {e}")
+        raise
+
+
+
+def verificar_archivo_no_vacio(archivo):
+    """Verifica si el archivo tiene contenido."""
+    try:
+        with open(archivo, "r", encoding="utf-8") as f:
+            contenido = f.read().strip()
+            if not contenido:
+                raise ValueError(f"El archivo {archivo} está vacío.")
+        print(f"El archivo {archivo} tiene contenido.")
+    except Exception as e:
+        print(f"Error verificando el archivo {archivo}: {e}")
+        raise
+
+
+
 def abrir_pull_request_en_navegador(pr_id):
     """
     Abrir la Pull Request en el navegador.
     
     :param pr_id: ID de la Pull Request.
     """
-    url = f"https://bitbucket.org/{WORKSPACE}/{REPO_SLUG}/pull-requests/{pr_id}"
+    url = f"https://bitbucket.org/iberdrola-clientes/iberdrola-sfdx/pull-requests/{pr_id}/diff"
     print(f"Abriendo la Pull Request #{pr_id} en el navegador: {url}")
     webbrowser.open(url)
 
@@ -85,60 +115,7 @@ def compare_diff_files(original_diff_file, local_diff_file):
 
     if not discrepancies_found:
         print("No se encontraron discrepancias. Las diferencias coinciden exactamente.")
-
-
-def normalizar_linea(linea):
-    """Normalizar una línea para ignorar diferencias de espacios, saltos de línea, y orden."""
-    return ''.join(linea.split()).lower()
-
-def obtener_diffs(repo, rango=None, cached=False):
-    """
-    Obtener diferencias (líneas añadidas y eliminadas) entre dos estados del repositorio.
-    
-    :param repo: Objeto del repositorio.
-    :param rango: Rango de commits para el diff (ej. 'commit1 commit2'). Si es None, usa cambios locales.
-    :param cached: Si es True, usa los cambios indexados ('--cached').
-    :return: Diccionario con el archivo como clave y un par de conjuntos (líneas añadidas, líneas eliminadas).
-    """
-    diffs = {}
-    try:
-        command = ['git', 'diff', '--unified=0']
-        if cached:
-            command.append('--cached')
-        elif rango:
-            command.extend(rango.split())
-        command.append('--')
-
-        diff_output = subprocess.run(
-            command, cwd=REPO_PATH, capture_output=True, text=True, shell=True
-        ).stdout.splitlines()
-
-        current_file = None
-        added_lines = set()
-        removed_lines = set()
-
-        for line in diff_output:
-            if line.startswith('+++ ') or line.startswith('--- '):
-                continue
-            elif line.startswith('diff --git'):
-                if current_file:
-                    diffs[current_file] = (added_lines, removed_lines)
-                    added_lines = set()
-                    removed_lines = set()
-                current_file = line.split(' ')[2].strip('b/')
-            elif line.startswith('+') and not line.startswith('+++'):
-                added_lines.add(normalizar_linea(line[1:]))
-            elif line.startswith('-') and not line.startswith('---'):
-                removed_lines.add(normalizar_linea(line[1:]))
-
-        if current_file:
-            diffs[current_file] = (added_lines, removed_lines)
-
-    except Exception as e:
-        print(f"Error obteniendo diffs: {e}")
-
-    return diffs
-
+        contar_lineas_modificadas()
 
 def obtener_diffs_por_archivo(repo, commit_base, commit_to=None):
     """
@@ -151,8 +128,7 @@ def obtener_diffs_por_archivo(repo, commit_base, commit_to=None):
     """
     diffs = {}
     try:
-        # Separar correctamente el rango de commits y los archivos
-        diff_range = f"{commit_base}..{commit_to}" if commit_to else commit_base
+        diff_range = f"{commit_base} {commit_to}" if commit_to else commit_base
         diff_output = repo.git.diff(diff_range, '--', unified=0).splitlines()
 
         current_file = None
@@ -163,19 +139,16 @@ def obtener_diffs_por_archivo(repo, commit_base, commit_to=None):
             if line.startswith('+++ ') or line.startswith('--- '):
                 continue
             elif line.startswith('diff --git'):
-                # Guardar los datos del archivo anterior si existe
                 if current_file:
                     diffs[current_file] = (added_lines, removed_lines)
                     added_lines = set()
                     removed_lines = set()
-                # Obtener el nombre del archivo del encabezado del diff
                 current_file = line.split(' ')[2].strip('b/')
             elif line.startswith('+') and not line.startswith('+++'):
-                added_lines.add(normalizar_linea(line[1:]))
+                added_lines.add(line[1:])  # Respetar espacios y tabulaciones
             elif line.startswith('-') and not line.startswith('---'):
-                removed_lines.add(normalizar_linea(line[1:]))
+                removed_lines.add(line[1:])  # Respetar espacios y tabulaciones
 
-        # Agregar el último archivo procesado
         if current_file:
             diffs[current_file] = (added_lines, removed_lines)
 
@@ -212,78 +185,63 @@ def comparar_diferencias(original_diffs, local_diffs):
     print("\nTodas las diferencias coinciden.")
     return True
 
-def compare_diff_files_with_context(original_diff_file, local_diff_file):
+def compare_diff_files_with_context(file1, file2):
     """
-    Compara dos archivos de diferencias y reporta las discrepancias, indicando el archivo donde ocurren.
-    :param original_diff_file: Archivo con las diferencias originales (commit).
-    :param local_diff_file: Archivo con las diferencias locales (--cached).
+    Comparar dos archivos línea por línea e imprimir diferencias, omitiendo los números de línea.
     """
     try:
-        # Leer las diferencias de los archivos
-        with open(original_diff_file, "r", encoding="utf-8") as f:
-            original_diff = f.readlines()
-        with open(local_diff_file, "r", encoding="utf-8") as f:
-            local_diff = f.readlines()
+        with open(file1, "r", encoding="utf-8") as f1, open(file2, "r", encoding="utf-8") as f2:
+            lines1 = [line for line in f1 if not line.startswith("@@")]
+            lines2 = [line for line in f2 if not line.startswith("@@")]
 
-        # Diccionario para rastrear discrepancias por archivo
-        discrepancies_by_file = {}
+            # Mostrar diferencias línea por línea
+            import difflib
+            diff = difflib.unified_diff(
+                lines1, lines2,
+                fromfile=file1,
+                tofile=file2,
+                lineterm=""
+            )
+            differences = list(diff)
 
-        # Variables temporales para almacenar el contexto
-        current_file = None
-
-        # Analizar diferencias originales
-        for line in original_diff:
-            if line.startswith("diff --git"):
-                # Extraer el nombre del archivo
-                parts = line.split(" ")
-                current_file = parts[2][2:]  # Quitar el prefijo "b/"
-                discrepancies_by_file[current_file] = {"original": set(), "local": set()}
-            elif line.startswith("+") and not line.startswith("+++"):
-                discrepancies_by_file[current_file]["original"].add(line[1:].strip())
-            elif line.startswith("-") and not line.startswith("---"):
-                discrepancies_by_file[current_file]["original"].add(line[1:].strip())
-
-        # Analizar diferencias locales
-        for line in local_diff:
-            if line.startswith("diff --git"):
-                # Extraer el nombre del archivo
-                parts = line.split(" ")
-                current_file = parts[2][2:]  # Quitar el prefijo "b/"
-                if current_file not in discrepancies_by_file:
-                    discrepancies_by_file[current_file] = {"original": set(), "local": set()}
-            elif line.startswith("+") and not line.startswith("+++"):
-                discrepancies_by_file[current_file]["local"].add(line[1:].strip())
-            elif line.startswith("-") and not line.startswith("---"):
-                discrepancies_by_file[current_file]["local"].add(line[1:].strip())
-
-        # Comparar las diferencias
-        discrepancies_found = False
-        for file, diffs in discrepancies_by_file.items():
-            original_lines = diffs["original"]
-            local_lines = diffs["local"]
-
-            extra_lines = local_lines - original_lines
-            missing_lines = original_lines - local_lines
-
-            if extra_lines or missing_lines:
-                discrepancies_found = True
-                print(f"\n***************************************")
-                print(f"\nDiscrepancias detectadas en el archivo: {file}")
-                if extra_lines:
-                    print("  Líneas adicionales en local:")
-                    for line in sorted(extra_lines):
-                        print(f"    + {line}")
-                if missing_lines:
-                    print("  Líneas faltantes en local:")
-                    for line in sorted(missing_lines):
-                        print(f"    - {line}")
-
-        if not discrepancies_found:
-            print("No se encontraron discrepancias entre los cambios originales y los locales.")
-
+            if differences:
+                contar_lineas_modificadas()
+                print("\n¡Se detectaron discrepancias! Detalles:")
+                current_file = None
+                for line in differences:
+                    # Detecta cambios de archivo
+                    if line.startswith("--- ") or line.startswith("+++ "):
+                        # Imprime la línea separadora antes de cada archivo
+                        if current_file != line:
+                            print("\n" + "*" * 40)
+                            current_file = line
+                    print(line.strip())
+                return False
+            else:
+                print("\n¡No se detectaron discrepancias! Los cambios coinciden exactamente.")
+                return True
     except Exception as e:
-        print(f"Error comparando los archivos de diferencias: {e}")
+        print(f"Error comparando archivos: {e}")
+        return False
 
+
+
+def verificar_conflictos(repo):
+    """Verificar si aún hay conflictos en el repositorio."""
+    try:
+        status_output = repo.git.status()
+        if "Unmerged paths:" in status_output:
+            return True
+        return False
+    except Exception as e:
+        print(f"Error verificando conflictos: {e}")
+        return True
+
+def normalizar_contenido(lines):
+    """
+    Normalizar contenido para evitar diferencias debido a caracteres invisibles.
+    """
+    return [line.replace("\r\n", "\n").replace("\r", "\n").strip() for line in lines]
 
 def realizar_cherry_pick_y_validar(repo, commit_id):
     """Realizar el cherry-pick y validar los cambios."""
@@ -292,25 +250,83 @@ def realizar_cherry_pick_y_validar(repo, commit_id):
         command = f'git cherry-pick -x --no-commit -m 1 {commit_id}'
         run_command(command, cwd=REPO_PATH, ignore_errors=True)
 
-        print("Resolviendo conflictos si los hay...")
-        input("Presiona ENTER una vez que hayas resuelto los conflictos y guardado los cambios.")
+        # Usar rutas completas para los archivos de diferencias
+        original_diff_file = os.path.join(REPO_PATH, "original_diff.txt")
+        local_diff_file = os.path.join(REPO_PATH, "local_diff.txt")
 
-        # Exportar diffs
-        original_diff_file = "original_diff.txt"
-        local_diff_file = "local_diff.txt"
+        while True:
+            time.sleep(5)
+            contar_lineas_modificadas()
+            input("Presiona ENTER una vez que hayas resuelto los conflictos, guardado los cambios, y realizado `git add` en los archivos afectados.")
+            
+            # Exportar diffs
+            print("Exportando diferencias originales...")
+            export_diff_to_file(repo, f"{commit_id}^1", commit_id, original_diff_file)
 
-        print("Exportando diferencias originales...")
-        export_diff_to_file(repo, f"{commit_id}^1", commit_id, original_diff_file)
+            print("Exportando diferencias locales...")
+            export_diff_to_file(repo, None, None, local_diff_file, cached=True)
 
-        print("Exportando diferencias locales...")
-        export_diff_to_file(repo, None, None, local_diff_file, cached=True)
+            # Comparar los archivos
+            print("Comparando diferencias entre original y local...")
+            if compare_diff_files_with_context(original_diff_file, local_diff_file):
+                print("\nNo se encontraron discrepancias. Continuando...")
+                break
 
-        # Comparar los archivos
-        print("Comparando diferencias entre original y local...")
-        compare_diff_files_with_context(original_diff_file, local_diff_file)
+            respuesta = input("¿Deseas intentar resolver las discrepancias nuevamente? (s/n): ").lower()
+            if respuesta != "s":
+                print("Proceso detenido por el usuario.")
+                raise Exception("Discrepancias no resueltas.")
+    except Exception as e:
+        print(f"Error durante el cherry-pick y validación: {e}")
+
+def contar_lineas_modificadas():
+    try:
+        # Ejecuta el comando git diff con estadísticas
+        result = subprocess.run(
+            ["git", "diff", "--numstat"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        
+        if result.stderr:
+            print(f"Error al ejecutar git diff: {result.stderr}")
+            return
+        
+        archivos = []
+        total_agregadas = 0
+        total_eliminadas = 0
+
+        # Procesa la salida del comando git diff
+        for linea in result.stdout.splitlines():
+            match = re.match(r"(\d+|-)\s+(\d+|-)\s+(.*)", linea)
+            if match:
+                agregadas = int(match.group(1)) if match.group(1) != '-' else 0
+                eliminadas = int(match.group(2)) if match.group(2) != '-' else 0
+                archivo = match.group(3)
+
+                archivos.append({
+                    "archivo": archivo,
+                    "lineas_agregadas": agregadas,
+                    "lineas_eliminadas": eliminadas
+                })
+
+                total_agregadas += agregadas
+                total_eliminadas += eliminadas
+
+        # Muestra el resumen por archivo
+        print(f"{'Archivo':<50} {'Líneas Añadidas':<15} {'Líneas Eliminadas':<15}")
+        print("="*80)
+        for archivo in archivos:
+            print(f"{archivo['archivo']:<50} {archivo['lineas_agregadas']:<15} {archivo['lineas_eliminadas']:<15}")
+        
+        # Muestra el total
+        print("="*80)
+        print(f"{'TOTAL':<50} {total_agregadas:<15} {total_eliminadas:<15}")
+        print(f"Líneas modificadas en total (añadidas + eliminadas): {total_agregadas + total_eliminadas}")
 
     except Exception as e:
-        print(f"Error test {e}")
+        print(f"Error al contar líneas modificadas: {e}")
 
 def main():
     repo = Repo(REPO_PATH)
@@ -338,6 +354,8 @@ def main():
             realizar_cherry_pick_y_validar(repo, commit_id)
         except Exception as e:
             print(f"Error procesando la PR #{pr_id}: {e}")
+
+        input("Presiona ENTER para proceder con la siguiente PR tras hacer commit")
 
 if __name__ == "__main__":
     main()

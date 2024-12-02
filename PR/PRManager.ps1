@@ -1,6 +1,6 @@
 #revertir último commit git reset--hard HEAD~1
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-$prNumbersList = @("8952", "8958", "8965", "8967", "8968", "7985")  # Reemplaza con los números reales de las PRs ej: "0001", "0004", "4462"
+$prNumbersList = @("8929", "8977", "8939")  # Reemplaza con los números reales de las PRs ej: "0001", "0004", "4462"
 $currentBranch = git rev-parse --abbrev-ref HEAD 2>&1
 
 function PreCherryPickActions{
