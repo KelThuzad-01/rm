@@ -8,7 +8,7 @@ import time
 
 # Configuración principal
 REPO_PATH = "C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx"  # Cambia por la ruta local de tu repositorio
-PULL_REQUESTS = [6854, 7209, 8968, 8958, 8991]  # Lista de IDs de las Pull Requests
+PULL_REQUESTS = [8957]  # Lista de IDs de las Pull Requests
 
 def run_command(command, cwd=None, ignore_errors=False):
     """Ejecutar un comando en la terminal."""
@@ -23,29 +23,75 @@ def run_command(command, cwd=None, ignore_errors=False):
 
 def export_diff_to_file(repo, commit_base, commit_to, output_file, cached=False):
     """
-    Exportar el resultado de git diff a un archivo.
+    Exportar el resultado de git diff a un archivo, excluyendo bloques completos relacionados con archivos específicos.
     """
     try:
+        # Si repo es un objeto Repo, obtener su directorio de trabajo
+        if isinstance(repo, str):
+            repo_path = repo
+        elif hasattr(repo, "working_dir"):
+            repo_path = repo.working_dir
+        else:
+            raise ValueError(f"repo debe ser una cadena o un objeto Repo. Recibido: {type(repo)}")
+
+        # Validar que la ruta del repositorio sea válida
+        if not os.path.isdir(repo_path):
+            raise ValueError(f"La ruta '{repo_path}' no apunta a un directorio existente.")
+
+        # Archivos a excluir
+        exclude_files = [
+            "config/tests-to-run.list",
+            "config/core-tests-to-run.list"
+        ]
+
+        # Construir el comando base de git diff
         if cached:
-            command = f"git diff --cached --unified=0 > {output_file}"
+            command = f"git diff --cached --unified=0"
         elif commit_base and commit_to:
-            # Asegurar que los commits estén correctamente formateados
-            command = f"git diff --unified=0 \"{commit_base}\" \"{commit_to}\" > \"{output_file}\""
+            command = f"git diff --unified=0 \"{commit_base}\" \"{commit_to}\""
         else:
             raise ValueError("Se requiere commit_base y commit_to para el diff no cached.")
 
         # Registrar el comando antes de ejecutarlo
         print(f"Ejecutando comando: {command}")
-        
+
         # Ejecutar el comando
         result = subprocess.run(
-            command, cwd=REPO_PATH, shell=True, capture_output=True, text=True
+            command,
+            cwd=repo_path,
+            shell=True,
+            capture_output=True,
+            text=True
         )
 
         # Verificar errores en la ejecución
         if result.returncode != 0:
             print(f"Error ejecutando el comando: {result.stderr.strip()}")
             raise Exception(f"Error exportando diferencias: {result.stderr.strip()}")
+
+        # Filtrar las diferencias para excluir bloques completos de archivos especificados
+        lines = result.stdout.splitlines()
+        filtered_lines = []
+        exclude_pattern = re.compile(r"^diff --git a/(.*) b/(.*)$")
+        exclude_active = False
+
+        for line in lines:
+            match = exclude_pattern.match(line)
+            if match:
+                # Detectar el archivo actual
+                current_file = match.group(1)
+                if any(exclude in current_file for exclude in exclude_files):
+                    exclude_active = True
+                    continue
+                else:
+                    exclude_active = False
+
+            if not exclude_active:
+                filtered_lines.append(line)
+
+        # Escribir las líneas filtradas al archivo de salida
+        with open(output_file, "w", encoding="utf-8") as f:
+            f.write("\n".join(filtered_lines))
 
         # Confirmar que el archivo fue generado
         if not os.path.exists(output_file) or os.stat(output_file).st_size == 0:
@@ -55,6 +101,7 @@ def export_diff_to_file(repo, commit_base, commit_to, output_file, cached=False)
     except Exception as e:
         print(f"Error exportando diferencias: {e}")
         raise
+
 
 
 
