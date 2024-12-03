@@ -3,10 +3,12 @@ import subprocess
 import webbrowser
 import re
 from git import Repo
+import time
+
 
 # Configuración principal
 REPO_PATH = "C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx"  # Cambia por la ruta local de tu repositorio
-PULL_REQUESTS = [8939, 8976, 8943]  # Lista de IDs de las Pull Requests
+PULL_REQUESTS = [6854, 7209, 8968, 8958, 8991]  # Lista de IDs de las Pull Requests
 
 def run_command(command, cwd=None, ignore_errors=False):
     """Ejecutar un comando en la terminal."""
@@ -226,6 +228,7 @@ def compare_diff_files_with_context(file1, file2):
 
 
 
+
 def verificar_conflictos(repo):
     """Verificar si aún hay conflictos en el repositorio."""
     try:
@@ -255,9 +258,7 @@ def realizar_cherry_pick_y_validar(repo, commit_id):
         local_diff_file = os.path.join(REPO_PATH, "local_diff.txt")
 
         while True:
-            time.sleep(5)
-            contar_lineas_modificadas()
-            input("Presiona ENTER una vez que hayas resuelto los conflictos, guardado los cambios, y realizado `git add` en los archivos afectados.")
+            input("Presiona ENTER si no hay conflictos. En caso contrario, solucionalos y añadelos en Staged Changes")
             
             # Exportar diffs
             print("Exportando diferencias originales...")
@@ -267,9 +268,12 @@ def realizar_cherry_pick_y_validar(repo, commit_id):
             export_diff_to_file(repo, None, None, local_diff_file, cached=True)
 
             # Comparar los archivos
+            contar_lineas_modificadas()
             print("Comparando diferencias entre original y local...")
             if compare_diff_files_with_context(original_diff_file, local_diff_file):
-                print("\nNo se encontraron discrepancias. Continuando...")
+                print("\nNo se encontraron discrepancias. Realizando commit...")
+                command = f'git commit --no-verify'
+                run_command(command, cwd=REPO_PATH, ignore_errors=True)
                 break
 
             respuesta = input("¿Deseas intentar resolver las discrepancias nuevamente? (s/n): ").lower()
@@ -278,12 +282,12 @@ def realizar_cherry_pick_y_validar(repo, commit_id):
                 raise Exception("Discrepancias no resueltas.")
     except Exception as e:
         print(f"Error durante el cherry-pick y validación: {e}")
-
+        contar_lineas_modificadas()
 def contar_lineas_modificadas():
     try:
         # Ejecuta el comando git diff con estadísticas
         result = subprocess.run(
-            ["git", "diff", "--numstat"],
+            ["git", "diff", "--numstat", "--cached"],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True
@@ -340,6 +344,9 @@ def main():
 
             if not commit_ids:
                 print(f"No se encontró un commit para la PR #{pr_id}.")
+                print(f"Ejecutando git fetch, por favor vuelve a lanzar esta PR")
+                command = f'git fetch --all'
+                run_command(command, cwd=REPO_PATH, ignore_errors=True)
                 continue
 
             if len(commit_ids) > 1:
