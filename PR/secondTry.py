@@ -362,7 +362,9 @@ def main():
         except Exception as e:
             print(f"Error procesando la PR #{pr_id}: {e}")
 
-        input("Presiona ENTER para proceder con la siguiente PR tras hacer commit")
+        print("Recuerda copiar de las RN la tabla verde + sus pasos manuales. Revisa también la hoja de ProcessBuilder_Flow.")
+        print("Cambia el estado de la solicitud en el teams IBD si no quedan más PR")
+        input("Presiona ENTER para proceder con la siguiente PR tras hacer commit.")
 
 if __name__ == "__main__":
     main()
