@@ -9,7 +9,7 @@ init(autoreset=True)
 
 # Configuración principal
 REPO_PATH = "C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx"  # Cambia por la ruta local de tu repositorio
-PULL_REQUESTS = [8933, 9021]  # Lista de IDs de las Pull Requests
+PULL_REQUESTS = [8968, 8958, 8929]  # Lista de IDs de las Pull Requests
 
 def run_command(command, cwd=None, ignore_errors=False):
     """Ejecutar un comando en la terminal."""
@@ -104,10 +104,6 @@ def export_diff_to_file(repo, commit_base, commit_to, output_file, cached=False)
         print(f"Error exportando diferencias: {e}")
         raise
 
-
-
-
-
 def verificar_archivo_no_vacio(archivo):
     """Verifica si el archivo tiene contenido."""
     try:
@@ -119,8 +115,6 @@ def verificar_archivo_no_vacio(archivo):
     except Exception as e:
         print(f"Error verificando el archivo {archivo}: {e}")
         raise
-
-
 
 def abrir_pull_request_en_navegador(pr_id):
     """
@@ -276,9 +270,6 @@ def compare_diff_files_with_context(file1, file2):
         print(f"Error comparando archivos: {e}")
         return False
 
-
-
-
 def verificar_conflictos(repo):
     """Verificar si aún hay conflictos en el repositorio."""
     try:
@@ -327,15 +318,9 @@ def realizar_cherry_pick_y_validar(repo, commit_id):
             print("Comparando diferencias entre original y local...")
             if compare_diff_files_with_context(original_diff_file, local_diff_file):
                 print("\033[32m\nNo se encontraron discrepancias.\033[0m")
-
-                # Confirmar antes de realizar el commit
-                respuesta = input("¿Deseas realizar el commit? (s/n): ").lower()
-                if respuesta == "s":
-                    print("Realizando commit...")
-                    command = f'git commit --no-verify'
-                    run_command(command, cwd=REPO_PATH, ignore_errors=True)
-                else:
-                    print("Commit cancelado por el usuario.")
+                print("Realizando commit...")
+                command = f'git commit --no-verify'
+                run_command(command, cwd=REPO_PATH, ignore_errors=True)
                 break
 
             # Validar integración de cambios si hay discrepancias
@@ -365,7 +350,7 @@ def realizar_cherry_pick_y_validar(repo, commit_id):
 def verificar_cambios_integrados(pull_request_file, local_diff_file, repo_path, output_file="diferencias_reportadas.txt"):
     """
     Verifica si los cambios de una pull request están correctamente integrados en los archivos locales,
-    manejando correctamente las líneas vacías.
+    manejando nombres de archivos con espacios.
 
     :param pull_request_file: Ruta al archivo con los cambios de la pull request (original_diff.txt).
     :param local_diff_file: Ruta al archivo con los cambios locales (local_diff.txt).
@@ -377,7 +362,7 @@ def verificar_cambios_integrados(pull_request_file, local_diff_file, repo_path, 
         with open(pull_request_file, "r", encoding="utf-8") as pr_file:
             pr_lines = pr_file.readlines()
 
-        # Extraer líneas añadidas (verdes) y eliminadas (rojas) del archivo original, ignorando líneas vacías
+        # Extraer líneas añadidas (verdes) y eliminadas (rojas) del archivo original
         added_lines = {line[1:].strip() for line in pr_lines if line.startswith('+') and not line.startswith('+++') and line.strip()}
         removed_lines = {line[1:].strip() for line in pr_lines if line.startswith('-') and not line.startswith('---') and line.strip()}
 
@@ -386,7 +371,9 @@ def verificar_cambios_integrados(pull_request_file, local_diff_file, repo_path, 
         current_file = None
         for line in pr_lines:
             if line.startswith("diff --git"):
-                current_file = line.split()[-1].replace("b/", "").strip()
+                # Escapar espacios en las rutas
+                file_path = line.split()[-1].replace("b/", "").strip()
+                current_file = os.path.normpath(file_path)
                 file_changes[current_file] = {"added": set(), "removed": set()}
             elif line.startswith('+') and not line.startswith('+++') and line.strip():
                 file_changes[current_file]["added"].add(line[1:].strip())
@@ -399,9 +386,10 @@ def verificar_cambios_integrados(pull_request_file, local_diff_file, repo_path, 
         discrepancies.append("=" * 80 + "\n")
 
         for file, changes in file_changes.items():
+            # Construir la ruta completa escapando espacios
             file_path = os.path.join(repo_path, file)
             if not os.path.exists(file_path):
-                discrepancies.append(f"⚠ El archivo {file_path} no existe en el sistema local.\n")
+                discrepancies.append(f"⚠ El archivo \"{file_path}\" no existe en el sistema local.\n")
                 continue
 
             with open(file_path, "r", encoding="utf-8") as f:
@@ -410,20 +398,20 @@ def verificar_cambios_integrados(pull_request_file, local_diff_file, repo_path, 
             # Verificar líneas añadidas (independiente de la posición)
             missing_added = changes["added"] - local_file_content
             if missing_added:
-                discrepancies.append(f"⚠ Líneas añadidas que faltan en el archivo {file_path}:\n")
+                discrepancies.append(f"⚠ Líneas añadidas que faltan en el archivo \"{file_path}\":\n")
                 for line in missing_added:
                     discrepancies.append(f"  + {line}\n")
             else:
-                discrepancies.append(f"✔ Todas las líneas añadidas están presentes en el archivo {file_path}.\n")
+                discrepancies.append(f"✔ Todas las líneas añadidas están presentes en el archivo \"{file_path}\".\n")
 
             # Verificar líneas eliminadas (independiente de la posición)
             present_removed = changes["removed"] & local_file_content
             if present_removed:
-                discrepancies.append(f"⚠ Líneas eliminadas que aún están presentes en el archivo {file_path}:\n")
+                discrepancies.append(f"⚠ Líneas eliminadas que aún están presentes en el archivo \"{file_path}\":\n")
                 for line in present_removed:
                     discrepancies.append(f"  - {line}\n")
             else:
-                discrepancies.append(f"✔ Todas las líneas eliminadas han sido correctamente eliminadas del archivo {file_path}.\n")
+                discrepancies.append(f"✔ Todas las líneas eliminadas han sido correctamente eliminadas del archivo \"{file_path}\".\n")
 
         # Exportar el reporte a un archivo
         with open(output_file, "w", encoding="utf-8") as report_file:
@@ -529,8 +517,8 @@ def main():
                 print(f"Archivo no encontrado, no es necesario eliminar: {diff_file}")
 
 
-        print("Recuerda copiar de las RN la tabla verde + sus pasos manuales. Revisa también la hoja de ProcessBuilder_Flow.")
-        print("Cambia el estado de la solicitud en el teams IBD si no quedan más PR")
+        print("\033[33mRecuerda copiar de las RN la tabla verde + sus pasos manuales. Revisa también la hoja de ProcessBuilder_Flow.\033[0m")
+        print("\033[33mCambia el estado de la solicitud en el teams IBD si no quedan más PR\033[0m")
         input("Presiona ENTER para proceder con la siguiente PR tras hacer commit.")
 
 
