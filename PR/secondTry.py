@@ -4,10 +4,12 @@ import webbrowser
 import re
 from git import Repo
 import time
+from colorama import Fore, Style, init
+init(autoreset=True)
 
 # Configuración principal
 REPO_PATH = "C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx"  # Cambia por la ruta local de tu repositorio
-PULL_REQUESTS = [8950, 9022, 7502, 7682, 7747, 8298, 8924, 8686, 8954, 9020, 9024]  # Lista de IDs de las Pull Requests
+PULL_REQUESTS = [8933, 9021]  # Lista de IDs de las Pull Requests
 
 def run_command(command, cwd=None, ignore_errors=False):
     """Ejecutar un comando en la terminal."""
@@ -22,7 +24,7 @@ def run_command(command, cwd=None, ignore_errors=False):
 
 def export_diff_to_file(repo, commit_base, commit_to, output_file, cached=False):
     """
-    Exportar el resultado de git diff a un archivo, excluyendo bloques completos relacionados con archivos específicos.
+    Exportar el resultado de git diff a un archivo, asegurando compatibilidad con caracteres especiales.
     """
     try:
         # Si repo es un objeto Repo, obtener su directorio de trabajo
@@ -54,13 +56,14 @@ def export_diff_to_file(repo, commit_base, commit_to, output_file, cached=False)
         # Registrar el comando antes de ejecutarlo
         print(f"Ejecutando comando: {command}")
 
-        # Ejecutar el comando
+        # Ejecutar el comando con codificación compatible
         result = subprocess.run(
             command,
             cwd=repo_path,
             shell=True,
             capture_output=True,
-            text=True
+            text=True,
+            encoding="utf-8"  # Asegurarse de usar UTF-8
         )
 
         # Verificar errores en la ejecución
@@ -88,7 +91,7 @@ def export_diff_to_file(repo, commit_base, commit_to, output_file, cached=False)
             if not exclude_active:
                 filtered_lines.append(line)
 
-        # Escribir las líneas filtradas al archivo de salida
+        # Escribir las líneas filtradas al archivo de salida en UTF-8
         with open(output_file, "w", encoding="utf-8") as f:
             f.write("\n".join(filtered_lines))
 
@@ -100,6 +103,7 @@ def export_diff_to_file(repo, commit_base, commit_to, output_file, cached=False)
     except Exception as e:
         print(f"Error exportando diferencias: {e}")
         raise
+
 
 
 
@@ -314,24 +318,42 @@ def realizar_cherry_pick_y_validar(repo, commit_id):
                     print(f"  - {conflict.split()[-1]}")
                 input("\033[31mPresiona ENTER tras resolver los conflictos y añadir los archivos a staged changes\033[0m")
             else:
-                print("No se detectaron conflictos. Continuando...")
+                print("\033[32mNo se detectaron conflictos. Continuando...\033[0m")
 
-            # Exportar diffs
-            print("Exportando diferencias originales...")
+
             export_diff_to_file(repo, f"{commit_id}^1", commit_id, original_diff_file)
-
-            print("Exportando diferencias locales...")
             export_diff_to_file(repo, None, None, local_diff_file, cached=True)
-
-            # Comparar los archivos
             contar_lineas_modificadas()
             print("Comparando diferencias entre original y local...")
             if compare_diff_files_with_context(original_diff_file, local_diff_file):
-                print("\nNo se encontraron discrepancias. Realizando commit...")
-                command = f'git commit --no-verify'
-                run_command(command, cwd=REPO_PATH, ignore_errors=True)
+                print("\033[32m\nNo se encontraron discrepancias.\033[0m")
+
+                # Confirmar antes de realizar el commit
+                respuesta = input("¿Deseas realizar el commit? (s/n): ").lower()
+                if respuesta == "s":
+                    print("Realizando commit...")
+                    command = f'git commit --no-verify'
+                    run_command(command, cwd=REPO_PATH, ignore_errors=True)
+                else:
+                    print("Commit cancelado por el usuario.")
                 break
 
+            # Validar integración de cambios si hay discrepancias
+            print("\nValidando si los cambios de la pull request están correctamente integrados en el archivo local...")
+            if verificar_cambios_integrados(pull_request_file="original_diff.txt",local_diff_file="local_diff.txt",repo_path=REPO_PATH,output_file="diferencias_reportadas.txt"):
+                print("\033[32mLos cambios parecen estar integrados correctamente.\033[0m")
+
+                # Confirmar antes de realizar el commit
+                respuesta = input("¿Deseas realizar el commit? (s/n): ").lower()
+                if respuesta == "s":
+                    print("Realizando commit...")
+                    command = f'git commit --no-verify'
+                    run_command(command, cwd=REPO_PATH, ignore_errors=True)
+                else:
+                    print("Commit cancelado por el usuario.")
+                break
+
+            # Preguntar al usuario si quiere continuar con las discrepancias
             respuesta = input("¿Deseas intentar resolver las discrepancias nuevamente? (s/n): ").lower()
             if respuesta != "s":
                 print("Proceso detenido por el usuario.")
@@ -339,6 +361,80 @@ def realizar_cherry_pick_y_validar(repo, commit_id):
     except Exception as e:
         print(f"Error durante el cherry-pick y validación: {e}")
         contar_lineas_modificadas()
+
+def verificar_cambios_integrados(pull_request_file, local_diff_file, repo_path, output_file="diferencias_reportadas.txt"):
+    """
+    Verifica si los cambios de una pull request están correctamente integrados en los archivos locales,
+    manejando correctamente las líneas vacías.
+
+    :param pull_request_file: Ruta al archivo con los cambios de la pull request (original_diff.txt).
+    :param local_diff_file: Ruta al archivo con los cambios locales (local_diff.txt).
+    :param repo_path: Ruta al repositorio para localizar los archivos afectados.
+    :param output_file: Ruta del archivo donde exportar las discrepancias detectadas.
+    """
+    try:
+        # Leer los archivos de diferencias
+        with open(pull_request_file, "r", encoding="utf-8") as pr_file:
+            pr_lines = pr_file.readlines()
+
+        # Extraer líneas añadidas (verdes) y eliminadas (rojas) del archivo original, ignorando líneas vacías
+        added_lines = {line[1:].strip() for line in pr_lines if line.startswith('+') and not line.startswith('+++') and line.strip()}
+        removed_lines = {line[1:].strip() for line in pr_lines if line.startswith('-') and not line.startswith('---') and line.strip()}
+
+        # Identificar los archivos afectados en la pull request
+        file_changes = {}
+        current_file = None
+        for line in pr_lines:
+            if line.startswith("diff --git"):
+                current_file = line.split()[-1].replace("b/", "").strip()
+                file_changes[current_file] = {"added": set(), "removed": set()}
+            elif line.startswith('+') and not line.startswith('+++') and line.strip():
+                file_changes[current_file]["added"].add(line[1:].strip())
+            elif line.startswith('-') and not line.startswith('---') and line.strip():
+                file_changes[current_file]["removed"].add(line[1:].strip())
+
+        # Crear un reporte detallado
+        discrepancies = []
+        discrepancies.append(f"Reporte de validación entre {pull_request_file} y {local_diff_file}\n")
+        discrepancies.append("=" * 80 + "\n")
+
+        for file, changes in file_changes.items():
+            file_path = os.path.join(repo_path, file)
+            if not os.path.exists(file_path):
+                discrepancies.append(f"⚠ El archivo {file_path} no existe en el sistema local.\n")
+                continue
+
+            with open(file_path, "r", encoding="utf-8") as f:
+                local_file_content = {line.strip() for line in f.readlines()}
+
+            # Verificar líneas añadidas (independiente de la posición)
+            missing_added = changes["added"] - local_file_content
+            if missing_added:
+                discrepancies.append(f"⚠ Líneas añadidas que faltan en el archivo {file_path}:\n")
+                for line in missing_added:
+                    discrepancies.append(f"  + {line}\n")
+            else:
+                discrepancies.append(f"✔ Todas las líneas añadidas están presentes en el archivo {file_path}.\n")
+
+            # Verificar líneas eliminadas (independiente de la posición)
+            present_removed = changes["removed"] & local_file_content
+            if present_removed:
+                discrepancies.append(f"⚠ Líneas eliminadas que aún están presentes en el archivo {file_path}:\n")
+                for line in present_removed:
+                    discrepancies.append(f"  - {line}\n")
+            else:
+                discrepancies.append(f"✔ Todas las líneas eliminadas han sido correctamente eliminadas del archivo {file_path}.\n")
+
+        # Exportar el reporte a un archivo
+        with open(output_file, "w", encoding="utf-8") as report_file:
+            report_file.writelines(discrepancies)
+
+        print(f"\n{Fore.YELLOW}Reporte de discrepancias exportado a: {output_file}{Style.RESET_ALL}")
+        return len(discrepancies) == 2  # Si solo hay el encabezado, no hubo discrepancias
+
+    except Exception as e:
+        print(f"{Fore.RED}Error verificando los cambios: {e}{Style.RESET_ALL}")
+        return False
 
 
 def contar_lineas_modificadas():
@@ -420,16 +516,18 @@ def main():
         except Exception as e:
             print(f"Error procesando la PR #{pr_id}: {e}")
 
-        # Eliminar los archivos local_diff.txt y original_diff.txt
+        # Eliminar los archivos local_diff.txt, original_diff.txt y diferencias_reportadas.txt
         local_diff_file = os.path.join(REPO_PATH, "local_diff.txt")
         original_diff_file = os.path.join(REPO_PATH, "original_diff.txt")
+        diferencias_reportadas_file = os.path.join(REPO_PATH, "diferencias_reportadas.txt")
 
-        for diff_file in [local_diff_file, original_diff_file]:
+        for diff_file in [local_diff_file, original_diff_file, diferencias_reportadas_file]:
             if os.path.exists(diff_file):
                 os.remove(diff_file)
                 print(f"Archivo eliminado: {diff_file}")
             else:
                 print(f"Archivo no encontrado, no es necesario eliminar: {diff_file}")
+
 
         print("Recuerda copiar de las RN la tabla verde + sus pasos manuales. Revisa también la hoja de ProcessBuilder_Flow.")
         print("Cambia el estado de la solicitud en el teams IBD si no quedan más PR")
