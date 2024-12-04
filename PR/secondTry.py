@@ -327,15 +327,9 @@ def realizar_cherry_pick_y_validar(repo, commit_id):
             print("\nValidando si los cambios de la pull request están correctamente integrados en el archivo local...")
             if verificar_cambios_integrados(pull_request_file="original_diff.txt",local_diff_file="local_diff.txt",repo_path=REPO_PATH,output_file="diferencias_reportadas.txt"):
                 print("\033[32mLos cambios parecen estar integrados correctamente.\033[0m")
-
-                # Confirmar antes de realizar el commit
-                respuesta = input("¿Deseas realizar el commit? (s/n): ").lower()
-                if respuesta == "s":
-                    print("Realizando commit...")
-                    command = f'git commit --no-verify'
-                    run_command(command, cwd=REPO_PATH, ignore_errors=True)
-                else:
-                    print("Commit cancelado por el usuario.")
+                print("Realizando commit...")
+                command = f'git commit --no-verify'
+                run_command(command, cwd=REPO_PATH, ignore_errors=True)
                 break
 
             # Preguntar al usuario si quiere continuar con las discrepancias
