@@ -5,10 +5,9 @@ import re
 from git import Repo
 import time
 
-
 # Configuración principal
 REPO_PATH = "C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx"  # Cambia por la ruta local de tu repositorio
-PULL_REQUESTS = [8957]  # Lista de IDs de las Pull Requests
+PULL_REQUESTS = [8950, 9022, 7502, 7682, 7747, 8298, 8924, 8686, 8954, 9020, 9024]  # Lista de IDs de las Pull Requests
 
 def run_command(command, cwd=None, ignore_errors=False):
     """Ejecutar un comando en la terminal."""
@@ -305,8 +304,18 @@ def realizar_cherry_pick_y_validar(repo, commit_id):
         local_diff_file = os.path.join(REPO_PATH, "local_diff.txt")
 
         while True:
-            input("Presiona ENTER si no hay conflictos. En caso contrario, solucionalos y añadelos en Staged Changes")
-            
+            # Verificar si hay conflictos
+            result = run_command("git status --porcelain", cwd=REPO_PATH, ignore_errors=True)
+            conflicts = [line for line in result.splitlines() if line.startswith("UU")]
+
+            if conflicts:
+                print("\033[31m\nConflictos detectados:\033[0m")
+                for conflict in conflicts:
+                    print(f"  - {conflict.split()[-1]}")
+                input("\033[31mPresiona ENTER tras resolver los conflictos y añadir los archivos a staged changes\033[0m")
+            else:
+                print("No se detectaron conflictos. Continuando...")
+
             # Exportar diffs
             print("Exportando diferencias originales...")
             export_diff_to_file(repo, f"{commit_id}^1", commit_id, original_diff_file)
@@ -330,6 +339,8 @@ def realizar_cherry_pick_y_validar(repo, commit_id):
     except Exception as e:
         print(f"Error durante el cherry-pick y validación: {e}")
         contar_lineas_modificadas()
+
+
 def contar_lineas_modificadas():
     try:
         # Ejecuta el comando git diff con estadísticas
@@ -383,7 +394,7 @@ def main():
     repo = Repo(REPO_PATH)
     for pr_id in PULL_REQUESTS:
         try:
-            print(f"Procesando PR #{pr_id}...")
+            print(f"\033[34mProcesando PR #{pr_id}...\033[0m")
             abrir_pull_request_en_navegador(pr_id)
             command = f'git log --all --grep="#{pr_id}" --format="%H"'
             result = run_command(command, cwd=REPO_PATH)
@@ -409,9 +420,21 @@ def main():
         except Exception as e:
             print(f"Error procesando la PR #{pr_id}: {e}")
 
+        # Eliminar los archivos local_diff.txt y original_diff.txt
+        local_diff_file = os.path.join(REPO_PATH, "local_diff.txt")
+        original_diff_file = os.path.join(REPO_PATH, "original_diff.txt")
+
+        for diff_file in [local_diff_file, original_diff_file]:
+            if os.path.exists(diff_file):
+                os.remove(diff_file)
+                print(f"Archivo eliminado: {diff_file}")
+            else:
+                print(f"Archivo no encontrado, no es necesario eliminar: {diff_file}")
+
         print("Recuerda copiar de las RN la tabla verde + sus pasos manuales. Revisa también la hoja de ProcessBuilder_Flow.")
         print("Cambia el estado de la solicitud en el teams IBD si no quedan más PR")
         input("Presiona ENTER para proceder con la siguiente PR tras hacer commit.")
+
 
 if __name__ == "__main__":
     main()
