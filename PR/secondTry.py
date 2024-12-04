@@ -9,7 +9,7 @@ init(autoreset=True)
 
 # Configuración principal
 REPO_PATH = "C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx"  # Cambia por la ruta local de tu repositorio
-PULL_REQUESTS = [8968, 8958, 8929]  # Lista de IDs de las Pull Requests
+PULL_REQUESTS = []  # Lista de IDs de las Pull Requests
 
 def run_command(command, cwd=None, ignore_errors=False):
     """Ejecutar un comando en la terminal."""
@@ -467,6 +467,71 @@ def contar_lineas_modificadas():
 
     except Exception as e:
         print(f"Error al contar líneas modificadas: {e}")
+def eliminar_lineas_duplicadas(archivo):
+    """
+    Elimina líneas duplicadas de un archivo, preservando el orden original.
+
+    :param archivo: Ruta al archivo donde eliminar duplicados.
+    """
+    try:
+        print(f"Procesando el archivo: {archivo}")
+        
+        # Leer el contenido del archivo
+        with open(archivo, "r", encoding="utf-8") as f:
+            lineas = f.readlines()
+        
+        # Eliminar duplicados mientras se preserva el orden
+        lineas_unicas = list(dict.fromkeys(lineas))
+        
+        # Sobrescribir el archivo con las líneas únicas
+        with open(archivo, "w", encoding="utf-8") as f:
+            f.writelines(lineas_unicas)
+        
+        print(f"Archivo procesado: {archivo}. Se eliminaron líneas duplicadas.")
+    
+    except FileNotFoundError:
+        print(f"El archivo {archivo} no existe. No se puede procesar.")
+    except Exception as e:
+        print(f"Error procesando el archivo {archivo}: {e}")
+
+
+
+def hacer_push_y_abrir_pr(repo):
+    """
+    Pregunta al usuario si desea hacer push de la rama actual al remoto.
+    Si la rama no existe en el remoto, la publica automáticamente.
+    Luego, abre la URL para crear una pull request.
+    """
+    try:
+        # Obtener la rama actual
+        current_branch = repo.git.rev_parse("--abbrev-ref", "HEAD")
+        print(f"Estás en la rama: {current_branch}")
+
+        # Preguntar si se desea hacer push
+        respuesta = input("¿Deseas hacer push al remoto? (s/n): ").strip().lower()
+        if respuesta != "s":
+            print("Push cancelado por el usuario.")
+            return
+
+        # Verificar si la rama existe en el remoto
+        remote_branches = repo.git.branch("-r")
+        remote_branch = f"origin/{current_branch}"
+        if remote_branch not in remote_branches:
+            print(f"La rama {current_branch} no existe en el remoto. Publicándola...")
+            repo.git.push("-u", "origin", current_branch)
+            print(f"Rama {current_branch} publicada en el remoto.")
+        else:
+            print(f"La rama {current_branch} ya existe en el remoto. Haciendo push...")
+            repo.git.push()
+            print("Push realizado con éxito.")
+
+        # Abrir la URL para crear la pull request
+        pr_url = f"https://bitbucket.org/iberdrola-clientes/iberdrola-sfdx/pull-requests/new?source={current_branch}&t=1"
+        print(f"Abriendo la URL para crear la pull request: {pr_url}")
+        webbrowser.open(pr_url)
+    except Exception as e:
+        print(f"Error al hacer push o abrir la URL de la pull request: {e}")
+
 
 def main():
     repo = Repo(REPO_PATH)
@@ -509,12 +574,14 @@ def main():
                 print(f"Archivo eliminado: {diff_file}")
             else:
                 print(f"Archivo no encontrado, no es necesario eliminar: {diff_file}")
-
+        
+        eliminar_lineas_duplicadas(os.path.join(REPO_PATH, "config/tests-to-run.list"))
 
         print("\033[33mRecuerda copiar de las RN la tabla verde + sus pasos manuales. Revisa también la hoja de ProcessBuilder_Flow.\033[0m")
         print("\033[33mCambia el estado de la solicitud en el teams IBD si no quedan más PR\033[0m")
         input("Presiona ENTER para proceder con la siguiente PR tras hacer commit.")
-
+    
+    hacer_push_y_abrir_pr(repo)
 
 if __name__ == "__main__":
     main()
