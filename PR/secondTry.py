@@ -9,7 +9,7 @@ init(autoreset=True)
 
 # Configuración principal
 REPO_PATH = "C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx"  # Cambia por la ruta local de tu repositorio
-PULL_REQUESTS = []  # Lista de IDs de las Pull Requests
+PULL_REQUESTS = [9039]  # Lista de IDs de las Pull Requests
 
 
 
@@ -18,7 +18,7 @@ def run_command(command, cwd=None, ignore_errors=False):
     result = subprocess.run(command, cwd=cwd, capture_output=True, text=True, shell=True)
     if result.returncode != 0:
         if ignore_errors:
-
+            print(f"")
         else:
             print(f"Error ejecutando {command}:\n{result.stderr}")
             raise Exception(result.stderr)
@@ -143,17 +143,8 @@ def compare_diff_files_with_context(file1, file2):
             differences = list(diff)
 
             if differences:
+                print("\n¡Se detectaron discrepancias!")
                 contar_lineas_modificadas()
-                print("\n¡Se detectaron discrepancias! Detalles:")
-                current_file = None
-                for line in differences:
-                    # Detecta cambios de archivo
-                    if line.startswith("--- ") or line.startswith("+++ "):
-                        # Imprime la línea separadora antes de cada archivo
-                        if current_file != line:
-                            print("\n" + "*" * 40)
-                            current_file = line
-                    print(line.strip())
                 return False
             else:
                 print("\n¡No se detectaron discrepancias! Los cambios coinciden exactamente.")
@@ -248,16 +239,12 @@ def verificar_cambios_integrados(pull_request_file, local_diff_file, repo_path, 
                 discrepancies.append(f"⚠ Líneas añadidas que faltan en el archivo \"{file_path}\":\n")
                 for line in missing_added:
                     discrepancies.append(f"  + {line}\n")
-            else:
-                discrepancies.append(f"✔ Todas las líneas añadidas están presentes en el archivo \"{file_path}\".\n")
 
             present_removed = changes["removed"] & local_file_content
             if present_removed:
                 discrepancies.append(f"⚠ Líneas eliminadas que aún están presentes en el archivo \"{file_path}\":\n")
                 for line in present_removed:
                     discrepancies.append(f"  - {line}\n")
-            else:
-                discrepancies.append(f"✔ Todas las líneas eliminadas han sido correctamente eliminadas del archivo \"{file_path}\".\n")
 
         with open(output_file, "w", encoding="utf-8") as report_file:
             report_file.writelines(discrepancies)
