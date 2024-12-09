@@ -9,7 +9,7 @@ init(autoreset=True)
 
 # Configuración principal
 REPO_PATH = "C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx"  # Cambia por la ruta local de tu repositorio
-PULL_REQUESTS = [9039]  # Lista de IDs de las Pull Requests
+PULL_REQUESTS = []  # Lista de IDs de las Pull Requests
 
 
 
@@ -182,7 +182,7 @@ def realizar_cherry_pick_y_validar(repo, commit_id):
             if compare_diff_files_with_context(original_diff_file, local_diff_file):
                 print("\033[32m\nNo se encontraron discrepancias.\033[0m")
                 print("Realizando commit...")
-                command = f'git commit --no-verify'
+                command = f'git commit --no-verify --no-edit'
                 run_command(command, cwd=REPO_PATH, ignore_errors=True)
                 break
 
@@ -334,12 +334,12 @@ def hacer_push_y_abrir_pr(repo):
             print(f"La rama {current_branch} no existe en el remoto. Publicándola...")
             repo.git.push("-u", "origin", current_branch)
             print(f"Rama {current_branch} publicada en el remoto.")
+            pr_url = f"https://bitbucket.org/iberdrola-clientes/iberdrola-sfdx/pull-requests/new?source={current_branch}&t=1"
+            webbrowser.open(pr_url)
         else:
             repo.git.push()
             print("Push realizado con éxito.")
 
-        pr_url = f"https://bitbucket.org/iberdrola-clientes/iberdrola-sfdx/pull-requests/new?source={current_branch}&t=1"
-        webbrowser.open(pr_url)
     except Exception as e:
         print(f"Error al hacer push o abrir la URL de la pull request: {e}")
 
@@ -383,7 +383,7 @@ def main():
                 os.remove(diff_file)
       
         eliminar_lineas_duplicadas(os.path.join(REPO_PATH, "config/tests-to-run.list"))
-
+        print(f"\033[34mFinalizada la PR #{pr_id}...\033[0m")
         print("\033[33mRecuerda copiar de las RN la tabla verde + sus pasos manuales. Revisa también la hoja de ProcessBuilder_Flow.\033[0m")
         print("\033[33mCambia el estado de la solicitud en el teams IBD si no quedan más PR\033[0m")
         input("Presiona ENTER para proceder con la siguiente PR tras hacer commit.")

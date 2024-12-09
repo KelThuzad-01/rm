@@ -2,6 +2,10 @@ const { execSync } = require('child_process');
 let profilePath = 'C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx\\force-app\\main\\default\\profiles';
 let permissionSetPath = 'C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx\\force-app\\main\\default\\permissionsets';
 
+// QA sfdx sgd:source:delta --from origin/master --output C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx
+// QA sfdx sgd:source:delta --from origin/develop --output C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx
+
+//PROD + QA
 //let deployCommand = 'sf project deploy start --target-org IBD-prod --manifest C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx\\package\\package.xml --ignore-conflicts --ignore-warnings --dry-run';
 let deployCommand = 'sf project deploy start --target-org QA-IBD --manifest C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx\\package\\package.xml --ignore-conflicts --ignore-warnings --dry-run';
 
