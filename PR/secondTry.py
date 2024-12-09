@@ -158,7 +158,7 @@ def realizar_cherry_pick_y_validar(repo, commit_id):
         print(f"Realizando cherry-pick del commit {commit_id}...")
         command = f'git cherry-pick -x --no-commit -m 1 {commit_id}'
         run_command(command, cwd=REPO_PATH, ignore_errors=True)
-
+        eliminar_lineas_duplicadas(os.path.join(REPO_PATH, "config/tests-to-run.list"))
         # Usar rutas completas para los archivos de diferencias
         original_diff_file = os.path.join(REPO_PATH, "original_diff.txt")
         local_diff_file = os.path.join(REPO_PATH, "local_diff.txt")
@@ -382,7 +382,7 @@ def main():
             if os.path.exists(diff_file):
                 os.remove(diff_file)
       
-        eliminar_lineas_duplicadas(os.path.join(REPO_PATH, "config/tests-to-run.list"))
+        
         print(f"\033[34mFinalizada la PR #{pr_id}...\033[0m")
         print("\033[33mRecuerda copiar de las RN la tabla verde + sus pasos manuales. Revisa también la hoja de ProcessBuilder_Flow.\033[0m")
         print("\033[33mCambia el estado de la solicitud en el teams IBD si no quedan más PR\033[0m")
