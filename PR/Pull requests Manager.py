@@ -9,9 +9,7 @@ init(autoreset=True)
 
 # Configuración principal
 REPO_PATH = "C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx"  # Cambia por la ruta local de tu repositorio
-PULL_REQUESTS = []  # Lista de IDs de las Pull Requests
-
-
+PULL_REQUESTS = [8992]  # Lista de IDs de las Pull Requests
 
 
 def run_command(command, cwd=None, ignore_errors=False):
