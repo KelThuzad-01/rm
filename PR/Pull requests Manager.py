@@ -9,7 +9,7 @@ init(autoreset=True)
 
 # Configuración principal
 REPO_PATH = "C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx"  # Cambia por la ruta local de tu repositorio
-PULL_REQUESTS = [9051, 9055, 9053]  # Lista de IDs de las Pull Requests.
+PULL_REQUESTS = [8947]  # Lista de IDs de las Pull Requests.
 #Para los hotfixes, basta con ir a las PR merged e ir sacando las PR
 
 
@@ -152,7 +152,7 @@ def compare_diff_files_with_context(file1, file2):
         print(f"Error comparando archivos: {e}")
         return False
 
-def realizar_cherry_pick_y_validar(repo, commit_id):
+def realizar_cherry_pick_y_validar(repo, commit_id, pr_id):
     try:
         print(f"Realizando cherry-pick del commit {commit_id}...")
         command = f'git cherry-pick -x --no-commit -m 1 {commit_id}'
@@ -169,6 +169,7 @@ def realizar_cherry_pick_y_validar(repo, commit_id):
 
             if conflicts:
                 print("\033[31m\nConflictos detectados:\033[0m")
+                abrir_pull_request_en_navegador(pr_id)
                 for conflict in conflicts:
                     print(f"  - {conflict.split()[-1]}")
                 input("\033[31mPresiona ENTER tras resolver los conflictos y añadir los archivos a staged changes\033[0m")
@@ -192,7 +193,7 @@ def realizar_cherry_pick_y_validar(repo, commit_id):
                 command = f'git commit --no-verify'
                 run_command(command, cwd=REPO_PATH, ignore_errors=True)
                 break
-
+            abrir_pull_request_en_navegador(pr_id)
             respuesta = input("¿Deseas intentar resolver las discrepancias nuevamente? (s/n): ").lower()
             if respuesta != "s":
                 raise Exception("Discrepancias no resueltas.")
@@ -374,7 +375,6 @@ def main():
     for pr_id in PULL_REQUESTS:
         try:
             print(f"\033[34mProcesando PR #{pr_id}...\033[0m")
-            abrir_pull_request_en_navegador(pr_id)
             command = f'git log --all --grep="#{pr_id}" --format="%H"'
             result = run_command(command, cwd=REPO_PATH)
             commit_ids = result.splitlines()
@@ -395,7 +395,7 @@ def main():
             else:
                 commit_id = commit_ids[0]
 
-            realizar_cherry_pick_y_validar(repo, commit_id)
+            realizar_cherry_pick_y_validar(repo, commit_id, pr_id)
         except Exception as e:
             print(f"Error procesando la PR #{pr_id}: {e}")
 
