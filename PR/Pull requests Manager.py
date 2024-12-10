@@ -201,13 +201,30 @@ def realizar_cherry_pick_y_validar(repo, commit_id):
         contar_lineas_modificadas()
 
 def verificar_cambios_integrados(pull_request_file, local_diff_file, repo_path, output_file="diferencias_reportadas.txt"):
+    """
+    Verifica si los cambios de una pull request están correctamente integrados en los archivos locales,
+    incluyendo la detección de líneas movidas.
+
+    :param pull_request_file: Ruta al archivo con los cambios de la pull request (original_diff.txt).
+    :param local_diff_file: Ruta al archivo con los cambios locales (local_diff.txt).
+    :param repo_path: Ruta al repositorio para localizar los archivos afectados.
+    :param output_file: Ruta del archivo donde exportar las discrepancias detectadas.
+    :return: True si todos los cambios están integrados, False si hay discrepancias.
+    """
     try:
+        # Leer los archivos de diferencias
         with open(pull_request_file, "r", encoding="utf-8") as pr_file:
             pr_lines = pr_file.readlines()
 
-        added_lines = {line[1:].strip() for line in pr_lines if line.startswith('+') and not line.startswith('+++') and line.strip()}
-        removed_lines = {line[1:].strip() for line in pr_lines if line.startswith('-') and not line.startswith('---') and line.strip()}
+        # Extraer líneas añadidas (verdes) y eliminadas (rojas)
+        added_lines = {line[1:].strip() for line in pr_lines if line.startswith('+') and not line.startswith('+++')}
+        removed_lines = {line[1:].strip() for line in pr_lines if line.startswith('-') and not line.startswith('---')}
 
+        # Identificar líneas movidas (presentes tanto en añadidas como en eliminadas)
+        moved_lines = removed_lines & added_lines
+        removed_lines -= moved_lines  # Excluir líneas movidas de las eliminadas
+
+        # Identificar los archivos afectados
         file_changes = {}
         current_file = None
         for line in pr_lines:
@@ -215,45 +232,55 @@ def verificar_cambios_integrados(pull_request_file, local_diff_file, repo_path, 
                 file_path = line.split()[-1].replace("b/", "").strip()
                 current_file = os.path.normpath(file_path)
                 file_changes[current_file] = {"added": set(), "removed": set()}
-            elif line.startswith('+') and not line.startswith('+++') and line.strip():
+            elif line.startswith('+') and not line.startswith('+++'):
                 file_changes[current_file]["added"].add(line[1:].strip())
-            elif line.startswith('-') and not line.startswith('---') and line.strip():
+            elif line.startswith('-') and not line.startswith('---'):
                 file_changes[current_file]["removed"].add(line[1:].strip())
 
+        # Crear un reporte detallado
         discrepancies = []
         discrepancies.append(f"Reporte de validación entre {pull_request_file} y {local_diff_file}\n")
         discrepancies.append("=" * 80 + "\n")
+
+        all_changes_integrated = True
 
         for file, changes in file_changes.items():
             file_path = os.path.join(repo_path, file)
             if not os.path.exists(file_path):
                 discrepancies.append(f"⚠ El archivo \"{file_path}\" no existe en el sistema local.\n")
+                all_changes_integrated = False
                 continue
 
             with open(file_path, "r", encoding="utf-8") as f:
                 local_file_content = {line.strip() for line in f.readlines()}
 
+            # Verificar líneas añadidas
             missing_added = changes["added"] - local_file_content
             if missing_added:
+                all_changes_integrated = False
                 discrepancies.append(f"⚠ Líneas añadidas que faltan en el archivo \"{file_path}\":\n")
                 for line in missing_added:
                     discrepancies.append(f"  + {line}\n")
 
-            present_removed = changes["removed"] & local_file_content
+            # Verificar líneas eliminadas, excluyendo líneas movidas
+            present_removed = (changes["removed"] - moved_lines) & local_file_content
             if present_removed:
+                all_changes_integrated = False
                 discrepancies.append(f"⚠ Líneas eliminadas que aún están presentes en el archivo \"{file_path}\":\n")
                 for line in present_removed:
                     discrepancies.append(f"  - {line}\n")
 
+        # Exportar el reporte a un archivo
         with open(output_file, "w", encoding="utf-8") as report_file:
             report_file.writelines(discrepancies)
 
         print(f"\n{Fore.YELLOW}Reporte de discrepancias exportado a: {output_file}{Style.RESET_ALL}")
-        return len(discrepancies) == 2
+        return all_changes_integrated
 
     except Exception as e:
         print(f"{Fore.RED}Error verificando los cambios: {e}{Style.RESET_ALL}")
         return False
+
 
 def contar_lineas_modificadas():
     try:
