@@ -9,7 +9,7 @@ init(autoreset=True)
 
 # Configuración principal
 REPO_PATH = "C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx"  # Cambia por la ruta local de tu repositorio
-PULL_REQUESTS = [8947]  # Lista de IDs de las Pull Requests.
+PULL_REQUESTS = []  # Lista de IDs de las Pull Requests.
 #Para los hotfixes, basta con ir a las PR merged e ir sacando las PR
 
 
@@ -193,7 +193,7 @@ def realizar_cherry_pick_y_validar(repo, commit_id, pr_id):
                 command = f'git commit --no-verify'
                 run_command(command, cwd=REPO_PATH, ignore_errors=True)
                 break
-            abrir_pull_request_en_navegador(pr_id)
+
             respuesta = input("¿Deseas intentar resolver las discrepancias nuevamente? (s/n): ").lower()
             if respuesta != "s":
                 raise Exception("Discrepancias no resueltas.")
@@ -204,7 +204,7 @@ def realizar_cherry_pick_y_validar(repo, commit_id, pr_id):
 def verificar_cambios_integrados(pull_request_file, local_diff_file, repo_path, output_file="diferencias_reportadas.txt"):
     """
     Verifica si los cambios de una pull request están correctamente integrados en los archivos locales,
-    incluyendo la detección de líneas movidas.
+    incluyendo la detección de líneas movidas. Ignora los archivos que no existen en el sistema local.
 
     :param pull_request_file: Ruta al archivo con los cambios de la pull request (original_diff.txt).
     :param local_diff_file: Ruta al archivo con los cambios locales (local_diff.txt).
@@ -247,9 +247,8 @@ def verificar_cambios_integrados(pull_request_file, local_diff_file, repo_path, 
 
         for file, changes in file_changes.items():
             file_path = os.path.join(repo_path, file)
+            # Ignorar archivos que no existen
             if not os.path.exists(file_path):
-                discrepancies.append(f"⚠ El archivo \"{file_path}\" no existe en el sistema local.\n")
-                all_changes_integrated = False
                 continue
 
             with open(file_path, "r", encoding="utf-8") as f:
