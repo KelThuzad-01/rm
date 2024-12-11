@@ -10,6 +10,7 @@ init(autoreset=True)
 # Configuración principal
 REPO_PATH = "C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx"  # Cambia por la ruta local de tu repositorio
 PULL_REQUESTS = []  # Lista de IDs de las Pull Requests.
+	
 #Para los hotfixes, basta con ir a las PR merged e ir sacando las PR
 
 
@@ -370,6 +371,9 @@ def hacer_push_y_abrir_pr(repo):
         print(f"Error al hacer push o abrir la URL de la pull request: {e}")
 
 def main():
+    PULL_REQUESTS.sort()
+    command = f'git fetch --all'
+    run_command(command, cwd=REPO_PATH, ignore_errors=True)
     repo = Repo(REPO_PATH)
     for pr_id in PULL_REQUESTS:
         try:
@@ -387,6 +391,7 @@ def main():
 
             if len(commit_ids) > 1:
                 print("Múltiples commits encontrados:")
+                abrir_pull_request_en_navegador(pr_id)
                 for i, commit_id in enumerate(commit_ids, 1):
                     print(f"  {i}. {commit_id}")
                 choice = int(input("Selecciona el commit a usar: ")) - 1
