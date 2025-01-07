@@ -9,7 +9,7 @@ init(autoreset=True)
 
 # Configuración principal
 REPO_PATH = "C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx"  # Cambia por la ruta local de tu repositorio
-PULL_REQUESTS = []  # Lista de IDs de las Pull Requests.
+PULL_REQUESTS = [9194, 9198]  # Lista de IDs de las Pull Requests.
 
 #Para los hotfixes, basta con ir a las PR merged e ir sacando las PR
 
@@ -259,41 +259,57 @@ def realizar_cherry_pick_y_validar(repo, commit_id, pr_id):
 def verificar_cambios_integrados(pull_request_file, local_diff_file, repo_path, output_file="diferencias_reportadas.txt"):
     """
     Verifica si los cambios de una pull request están correctamente integrados en los archivos locales,
-    incluyendo la detección de líneas movidas. Ignora los archivos que no existen en el sistema local.
-
-    :param pull_request_file: Ruta al archivo con los cambios de la pull request (original_diff.txt).
-    :param local_diff_file: Ruta al archivo con los cambios locales (local_diff.txt).
-    :param repo_path: Ruta al repositorio para localizar los archivos afectados.
-    :param output_file: Ruta del archivo donde exportar las discrepancias detectadas.
-    :return: True si todos los cambios están integrados, False si hay discrepancias.
+    manejando líneas movidas y verificando el contexto de líneas añadidas y eliminadas.
     """
     try:
         # Leer los archivos de diferencias
         with open(pull_request_file, "r", encoding="utf-8") as pr_file:
             pr_lines = pr_file.readlines()
 
-        # Extraer líneas añadidas (verdes) y eliminadas (rojas)
-        added_lines = {line[1:].strip() for line in pr_lines if line.startswith('+') and not line.startswith('+++')}
-        removed_lines = {line[1:].strip() for line in pr_lines if line.startswith('-') and not line.startswith('---')}
-
-        # Identificar líneas movidas (presentes tanto en añadidas como en eliminadas)
-        moved_lines = removed_lines & added_lines
-        removed_lines -= moved_lines  # Excluir líneas movidas de las eliminadas
-
-        # Identificar los archivos afectados
+        # Extraer líneas añadidas y eliminadas junto con su contexto
         file_changes = {}
         current_file = None
+        current_context = []
+
         for line in pr_lines:
             if line.startswith("diff --git"):
+                # Guardar los cambios del archivo actual
+                if current_file:
+                    file_changes[current_file]["removed_with_context"] = file_changes[current_file].get("removed_with_context", [])
+                    file_changes[current_file]["added_with_context"] = file_changes[current_file].get("added_with_context", [])
                 file_path = line.split()[-1].replace("b/", "").strip()
                 current_file = os.path.normpath(file_path)
-                file_changes[current_file] = {"added": set(), "removed": set()}
+                file_changes[current_file] = {"added_with_context": [], "removed_with_context": []}
+                current_context = []
             elif line.startswith('+') and not line.startswith('+++'):
-                file_changes[current_file]["added"].add(line[1:].strip())
+                # Guardar la línea añadida con su contexto
+                context_before = current_context[-3:] if len(current_context) >= 3 else current_context
+                context_after = []  # Se llenará con próximas líneas reales
+                file_changes[current_file]["added_with_context"].append({
+                    "line": line[1:].strip(),
+                    "context_before": context_before,
+                    "context_after": context_after
+                })
             elif line.startswith('-') and not line.startswith('---'):
-                file_changes[current_file]["removed"].add(line[1:].strip())
+                # Ignorar líneas eliminadas para el contexto
+                continue
+            elif current_file and not (
+                line.startswith("@@") or line.startswith("+++")
+                or line.startswith("index") or line.startswith("---")
+            ):
+                # Actualizar contexto para líneas posteriores, ignorando metadatos y eliminadas
+                current_context.append(line.strip())
+                # Añadir contexto a las últimas líneas añadidas
+                for added in file_changes[current_file]["added_with_context"][-3:]:
+                    if len(added["context_after"]) < 3:
+                        added["context_after"].append(line.strip())
 
-        # Crear un reporte detallado
+        # Guardar los cambios del último archivo
+        if current_file:
+            file_changes[current_file]["removed_with_context"] = file_changes[current_file].get("removed_with_context", [])
+            file_changes[current_file]["added_with_context"] = file_changes[current_file].get("added_with_context", [])
+
+        # Crear reporte detallado
         discrepancies = []
         discrepancies.append(f"Reporte de validación entre {pull_request_file} y {local_diff_file}\n")
         discrepancies.append("=" * 80 + "\n")
@@ -302,28 +318,41 @@ def verificar_cambios_integrados(pull_request_file, local_diff_file, repo_path, 
 
         for file, changes in file_changes.items():
             file_path = os.path.join(repo_path, file)
+
             # Ignorar archivos que no existen
             if not os.path.exists(file_path):
                 continue
 
             with open(file_path, "r", encoding="utf-8") as f:
-                local_file_content = {line.strip() for line in f.readlines()}
+                local_file_lines = [line.strip() for line in f.readlines()]
 
-            # Verificar líneas añadidas
-            missing_added = changes["added"] - local_file_content
-            if missing_added:
-                all_changes_integrated = False
-                discrepancies.append(f"⚠ Líneas añadidas que faltan en el archivo \"{file_path}\":\n")
-                for line in missing_added:
-                    discrepancies.append(f"  + {line}\n")
+            # Validar líneas añadidas basadas en contexto
+            for added in changes["added_with_context"]:
+                line = added["line"]
+                context_before = added["context_before"]
+                context_after = added["context_after"]
 
-            # Verificar líneas eliminadas, excluyendo líneas movidas
-            present_removed = (changes["removed"] - moved_lines) & local_file_content
-            if present_removed:
-                all_changes_integrated = False
-                discrepancies.append(f"⚠ Líneas eliminadas que aún están presentes en el archivo \"{file_path}\":\n")
-                for line in present_removed:
-                    discrepancies.append(f"  - {line}\n")
+                if line not in local_file_lines:
+                    all_changes_integrated = False
+                    discrepancies.append(
+                        f"⚠ Línea añadida no encontrada en el archivo \"{file_path}\" con su contexto esperado:\n"
+                        f"  Línea: {line}\n"
+                        f"  Contexto Antes: {context_before}\n"
+                        f"  Contexto Después: {context_after}\n"
+                    )
+                else:
+                    index = local_file_lines.index(line)
+                    before_match = local_file_lines[max(0, index - len(context_before)):index] == context_before
+                    after_match = local_file_lines[index + 1:index + 1 + len(context_after)] == context_after
+
+                    if not before_match or not after_match:
+                        all_changes_integrated = False
+                        discrepancies.append(
+                            f"⚠ Línea añadida encontrada pero fuera de contexto en el archivo \"{file_path}\":\n"
+                            f"  Línea: {line}\n"
+                            f"  Contexto Antes: {context_before}\n"
+                            f"  Contexto Después: {context_after}\n"
+                        )
 
         # Exportar el reporte a un archivo
         with open(output_file, "w", encoding="utf-8") as report_file:
