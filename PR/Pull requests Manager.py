@@ -151,12 +151,67 @@ def compare_diff_files_with_context(file1, file2):
     except Exception as e:
         print(f"Error comparando archivos: {e}")
         return False
+def resolver_conflictos_tests_to_run(archivo):
+    """
+    Resolver automáticamente los conflictos en el archivo `config/tests-to-run.list` 
+    aceptando ambos cambios.
+    """
+    try:
+        if not os.path.exists(archivo):
+            print(f"El archivo {archivo} no existe. No hay conflictos que resolver.")
+            return False
+
+        with open(archivo, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+
+        resolved_lines = []
+        in_conflict = False
+        conflict_section = []
+
+        for line in lines:
+            if line.startswith("<<<<<<<"):
+                in_conflict = True
+                conflict_section = []  # Inicializa la sección de conflicto
+            elif line.startswith("======="):
+                # Aquí terminan las líneas de la primera sección en conflicto
+                conflict_section.append(line.strip())
+            elif line.startswith(">>>>>>>"):
+                # Final del conflicto. Aceptar ambas secciones.
+                in_conflict = False
+                resolved_lines.extend(conflict_section)  # Mantener ambas partes
+                conflict_section = []
+            else:
+                if in_conflict:
+                    # Agregar línea en conflicto
+                    conflict_section.append(line.strip())
+                else:
+                    # Línea fuera de conflicto, agregarla al resultado
+                    resolved_lines.append(line.strip())
+
+        # Sobrescribir el archivo con los cambios resueltos
+        with open(archivo, "w", encoding="utf-8") as f:
+            f.write("\n".join(resolved_lines) + "\n")
+
+        print(f"Conflictos resueltos automáticamente en el archivo: {archivo}")
+        return True
+
+    except Exception as e:
+        print(f"Error resolviendo conflictos en {archivo}: {e}")
+        return False
 
 def realizar_cherry_pick_y_validar(repo, commit_id, pr_id):
     try:
         print(f"Realizando cherry-pick del commit {commit_id}...")
         command = f'git cherry-pick -x --no-commit -m 1 {commit_id}'
         run_command(command, cwd=REPO_PATH, ignore_errors=True)
+        archivo_conflicto = os.path.join(REPO_PATH, "config/tests-to-run.list")
+        # Resolver automáticamente conflictos en `config/tests-to-run.list`
+        if os.path.exists(archivo_conflicto):
+            print("Detectando conflictos en config/tests-to-run.list...")
+            if resolver_conflictos_tests_to_run(archivo_conflicto):
+                run_command(f"git add {archivo_conflicto}", cwd=REPO_PATH)
+                print(f"Conflictos resueltos automáticamente y {archivo_conflicto} añadido a staged changes.")
+
         eliminar_lineas_duplicadas(os.path.join(REPO_PATH, "config/tests-to-run.list"))
         # Usar rutas completas para los archivos de diferencias
         original_diff_file = os.path.join(REPO_PATH, "original_diff.txt")
