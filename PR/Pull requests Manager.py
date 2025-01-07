@@ -10,9 +10,8 @@ init(autoreset=True)
 # Configuración principal
 REPO_PATH = "C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx"  # Cambia por la ruta local de tu repositorio
 PULL_REQUESTS = []  # Lista de IDs de las Pull Requests.
-	
-#Para los hotfixes, basta con ir a las PR merged e ir sacando las PR
 
+#Para los hotfixes, basta con ir a las PR merged e ir sacando las PR
 
 def run_command(command, cwd=None, ignore_errors=False):
     result = subprocess.run(command, cwd=cwd, capture_output=True, text=True, shell=True)
@@ -390,15 +389,13 @@ def main():
                 continue
 
             if len(commit_ids) > 1:
-                print("Múltiples commits encontrados:")
-                abrir_pull_request_en_navegador(pr_id)
+                print("Múltiples commits encontrados. Seleccionando automáticamente el commit de merge más reciente:")
                 for i, commit_id in enumerate(commit_ids, 1):
                     print(f"  {i}. {commit_id}")
-                choice = int(input("Selecciona el commit a usar: ")) - 1
-                commit_id = commit_ids[choice]
+                    commit_id = commit_ids[-1]  # Seleccionar el último commit (más reciente)
+                    print(f"Seleccionado automáticamente el commit más reciente: {commit_id}")
             else:
                 commit_id = commit_ids[0]
-
             realizar_cherry_pick_y_validar(repo, commit_id, pr_id)
         except Exception as e:
             print(f"Error procesando la PR #{pr_id}: {e}")
