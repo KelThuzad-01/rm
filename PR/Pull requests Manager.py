@@ -9,7 +9,7 @@ init(autoreset=True)
 
 # Configuración principal
 REPO_PATH = "C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx"  # Cambia por la ruta local de tu repositorio
-PULL_REQUESTS = [9149, 9050, 9077, 9080]  # Lista de IDs de las Pull Requests.
+PULL_REQUESTS = [9077, 9080]  # Lista de IDs de las Pull Requests.
 	
 #Para los hotfixes, basta con ir a las PR merged e ir sacando las PR
 
@@ -72,6 +72,48 @@ def resolver_conflictos_tests_to_run(archivo):
     except Exception as e:
         print(f"Error resolviendo conflictos en {archivo}: {e}")
         return False
+
+def ejecutar_pre_push():
+    """
+    Ejecuta comandos de despliegue para QA o PROD según la selección del usuario.
+    """
+    try:
+        print("Selecciona el entorno de despliegue:")
+        print("1 - QA")
+        print("2 - PROD")
+        
+        opcion = input("Ingresa tu opción (1 o 2): ").strip()
+
+        if opcion == "1":
+            print("\nSeleccionaste QA. Ejecutando comandos para QA...")
+            comandos = [
+                "git fetch --all",
+                "sfdx sgd:source:delta -f origin/develop -o deploy-manifest --ignore .deltaignore -W",
+                "sfdx force:source:deploy --target-org QA-IBD -x deploy-manifest/package/package.xml --postdestructivechanges deploy-manifest/destructiveChanges/destructiveChanges.xml --wait 120 --ignorewarnings --json --verbose -c"
+            ]
+        elif opcion == "2":
+            print("\nSeleccionaste PROD. Ejecutando comandos para PROD...")
+            comandos = [
+                "git fetch --all",
+                "sfdx sgd:source:delta -f origin/master -o deploy-manifest --ignore .deltaignore -W",
+                "sfdx force:source:deploy --target-org IBD-prod -x deploy-manifest/package/package.xml --postdestructivechanges deploy-manifest/destructiveChanges/destructiveChanges.xml --wait 120 --ignorewarnings --json --verbose -c"
+            ]
+        else:
+            print("\nOpción no válida. Por favor, selecciona 1 o 2.")
+            return
+
+        # Ejecutar comandos
+        for comando in comandos:
+            print(f"Ejecutando: {comando}")
+            result = subprocess.run(comando, shell=True, text=True)
+            if result.returncode != 0:
+                print(f"Error ejecutando el comando: {comando}")
+                return
+
+        print("\nComandos ejecutados correctamente.")
+
+    except Exception as e:
+        print(f"Error en ejecutar_pre_push: {e}")
 
 
 def export_diff_to_file(repo, commit_base, commit_to, output_file, cached=False):
@@ -475,7 +517,7 @@ def main():
         print("\033[33mRecuerda copiar de las RN la tabla verde + sus pasos manuales. Revisa también la hoja de ProcessBuilder_Flow.\033[0m")
         print("\033[33mCambia el estado de la solicitud en el teams IBD si no quedan más PR\033[0m")
         input("Presiona ENTER para proceder con la siguiente PR tras hacer commit.")
-    
+    ejecutar_pre_push()
     hacer_push_y_abrir_pr(repo)
 
 if __name__ == "__main__":
