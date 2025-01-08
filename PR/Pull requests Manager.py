@@ -9,7 +9,8 @@ init(autoreset=True)
 
 # Configuración principal
 REPO_PATH = "C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx"  # Cambia por la ruta local de tu repositorio
-PULL_REQUESTS = [9194, 9198]  # Lista de IDs de las Pull Requests.
+PULL_REQUESTS = [9089, 9057, 9081, 9044,9065 ]  # Lista de IDs de las Pull Requests.
+
 
 #Para los hotfixes, basta con ir a las PR merged e ir sacando las PR
 
@@ -270,18 +271,22 @@ def verificar_cambios_integrados(pull_request_file, local_diff_file, repo_path, 
         file_changes = {}
         current_file = None
         current_context = []
+        is_new_file = False
 
         for line in pr_lines:
             if line.startswith("diff --git"):
                 # Guardar los cambios del archivo actual
-                if current_file:
+                if current_file and not is_new_file:
                     file_changes[current_file]["removed_with_context"] = file_changes[current_file].get("removed_with_context", [])
                     file_changes[current_file]["added_with_context"] = file_changes[current_file].get("added_with_context", [])
-                file_path = line.split()[-1].replace("b/", "").strip()
-                current_file = os.path.normpath(file_path)
+                # Detectar nuevo archivo
+                is_new_file = False
+                current_file = os.path.normpath(line.split()[-1].replace("b/", "").strip())
                 file_changes[current_file] = {"added_with_context": [], "removed_with_context": []}
                 current_context = []
-            elif line.startswith('+') and not line.startswith('+++'):
+            elif "new file mode" in line:
+                is_new_file = True
+            elif line.startswith('+') and not line.startswith('+++') and not is_new_file:
                 # Guardar la línea añadida con su contexto
                 context_before = current_context[-3:] if len(current_context) >= 3 else current_context
                 context_after = []  # Se llenará con próximas líneas reales
@@ -290,7 +295,7 @@ def verificar_cambios_integrados(pull_request_file, local_diff_file, repo_path, 
                     "context_before": context_before,
                     "context_after": context_after
                 })
-            elif line.startswith('-') and not line.startswith('---'):
+            elif line.startswith('-') and not line.startswith('---') and not is_new_file:
                 # Ignorar líneas eliminadas para el contexto
                 continue
             elif current_file and not (
@@ -304,8 +309,8 @@ def verificar_cambios_integrados(pull_request_file, local_diff_file, repo_path, 
                     if len(added["context_after"]) < 3:
                         added["context_after"].append(line.strip())
 
-        # Guardar los cambios del último archivo
-        if current_file:
+        # Guardar los cambios del último archivo si no es nuevo
+        if current_file and not is_new_file:
             file_changes[current_file]["removed_with_context"] = file_changes[current_file].get("removed_with_context", [])
             file_changes[current_file]["added_with_context"] = file_changes[current_file].get("added_with_context", [])
 
@@ -364,7 +369,6 @@ def verificar_cambios_integrados(pull_request_file, local_diff_file, repo_path, 
     except Exception as e:
         print(f"{Fore.RED}Error verificando los cambios: {e}{Style.RESET_ALL}")
         return False
-
 
 def contar_lineas_modificadas():
     try:
@@ -427,6 +431,51 @@ def eliminar_lineas_duplicadas(archivo):
         print(f"El archivo {archivo} no existe. No se puede procesar.")
     except Exception as e:
         print(f"Error procesando el archivo {archivo}: {e}")
+
+def ejecutar_pre_push():
+    """
+    Pregunta si se desea desplegar en QA o PROD, ejecuta los comandos correspondientes,
+    y permite repetir el despliegue si es necesario.
+    """
+    while True:
+        try:
+            print("\nSeleccione una opción:")
+            print("1. QA")
+            print("2. PROD")
+            opcion = input("Ingrese el número de la opción (1 o 2): ").strip()
+
+            if opcion == "1":
+                print("Lanzando comandos para QA...")
+                comandos = [
+                    "git fetch --all",
+                    "sfdx sgd:source:delta -f origin/develop -o deploy-manifest --ignore .deltaignore -W",
+                    "sfdx force:source:deploy --target-org QA-IBD -x deploy-manifest/package/package.xml --postdestructivechanges deploy-manifest/destructiveChanges/destructiveChanges.xml --wait 120 --ignorewarnings --json --verbose -c"
+                ]
+            elif opcion == "2":
+                print("Lanzando comandos para PROD...")
+                comandos = [
+                    "git fetch --all",
+                    "sfdx sgd:source:delta -f origin/master -o deploy-manifest --ignore .deltaignore -W",
+                    "sfdx force:source:deploy --target-org IBD-prod -x deploy-manifest/package/package.xml --postdestructivechanges deploy-manifest/destructiveChanges/destructiveChanges.xml --wait 120 --ignorewarnings --json --verbose -c"
+                ]
+            else:
+                print("Opción no válida. Por favor, elija 1 o 2.")
+                continue
+
+            # Ejecutar los comandos seleccionados
+            for comando in comandos:
+                print(f"Ejecutando: {comando}")
+                run_command(comando, cwd=REPO_PATH)
+
+            # Preguntar si se desea repetir los comandos
+            repetir = input("¿Desea lanzar los comandos nuevamente? (s/n): ").strip().lower()
+            if repetir != "s":
+                print("Procediendo con el proceso normal...")
+                break
+        except Exception as e:
+            print(f"Error ejecutando los comandos: {e}")
+            continue
+
 
 def hacer_push_y_abrir_pr(repo):
     try:
@@ -498,7 +547,7 @@ def main():
         print("\033[33mRecuerda copiar de las RN la tabla verde + sus pasos manuales. Revisa también la hoja de ProcessBuilder_Flow.\033[0m")
         print("\033[33mCambia el estado de la solicitud en el teams IBD si no quedan más PR\033[0m")
         input("Presiona ENTER para proceder con la siguiente PR tras hacer commit.")
-    
+    ejecutar_pre_push()
     hacer_push_y_abrir_pr(repo)
 
 if __name__ == "__main__":
