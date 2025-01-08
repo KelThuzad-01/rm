@@ -152,10 +152,11 @@ def compare_diff_files_with_context(file1, file2):
     except Exception as e:
         print(f"Error comparando archivos: {e}")
         return False
+
 def resolver_conflictos_tests_to_run(archivo):
     """
     Resolver automáticamente los conflictos en el archivo `config/tests-to-run.list` 
-    aceptando ambos cambios.
+    aceptando únicamente las líneas añadidas y omitiendo las eliminadas.
     """
     try:
         if not os.path.exists(archivo):
@@ -177,9 +178,10 @@ def resolver_conflictos_tests_to_run(archivo):
                 # Termina la primera parte del conflicto, comienza la segunda
                 continue
             elif line.startswith(">>>>>>>"):
-                # Final del conflicto, resolver aceptando ambas secciones
+                # Final del conflicto, resolver aceptando únicamente líneas nuevas
                 in_conflict = False
-                resolved_lines.extend(current_section)
+                # Filtrar solo las líneas que no comienzan con "-"
+                resolved_lines.extend([l for l in current_section if not l.startswith("-")])
                 current_section = []
             else:
                 if in_conflict:
@@ -201,7 +203,8 @@ def resolver_conflictos_tests_to_run(archivo):
         return False
 
 
-def realizar_cherry_pick_y_validar(repo, commit_id, pr_id):
+
+def realizar_cherry_pick_y_validar(repo, commit_id, pr_id): 
     try:
         print(f"Realizando cherry-pick del commit {commit_id}...")
         command = f'git cherry-pick -x --no-commit -m 1 {commit_id}'
@@ -236,7 +239,15 @@ def realizar_cherry_pick_y_validar(repo, commit_id, pr_id):
             export_diff_to_file(repo, f"{commit_id}^1", commit_id, original_diff_file)
             export_diff_to_file(repo, None, None, local_diff_file, cached=True)
             contar_lineas_modificadas()
-            if compare_diff_files_with_context(original_diff_file, local_diff_file):
+            
+            if not compare_diff_files_with_context(original_diff_file, local_diff_file):
+                # Preguntar si desea continuar tras revisar las discrepancias
+                print("\n¡Se detectaron discrepancias en los cambios!")
+                print(f"Por favor, revise el archivo de diferencias: {os.path.abspath('diferencias_reportadas.txt')}")
+                continuar = input("¿Desea continuar a pesar de las discrepancias? (s/n): ").strip().lower()
+                if continuar != "s":
+                    raise Exception("Discrepancias detectadas. Proceso abortado por el usuario.")
+            else:
                 print("\033[32m\nNo se encontraron discrepancias.\033[0m")
                 print("Realizando commit...")
                 command = f'git commit --no-verify --no-edit'
@@ -244,7 +255,7 @@ def realizar_cherry_pick_y_validar(repo, commit_id, pr_id):
                 break
 
             print("\nValidando si los cambios de la pull request están correctamente integrados en el archivo local...")
-            if verificar_cambios_integrados(pull_request_file="original_diff.txt",local_diff_file="local_diff.txt",repo_path=REPO_PATH,output_file="diferencias_reportadas.txt"):
+            if verificar_cambios_integrados(pull_request_file="original_diff.txt", local_diff_file="local_diff.txt", repo_path=REPO_PATH, output_file="diferencias_reportadas.txt"):
                 print("\033[32mLos cambios parecen estar integrados correctamente.\033[0m")
                 print("Realizando commit...")
                 command = f'git commit --no-verify'
