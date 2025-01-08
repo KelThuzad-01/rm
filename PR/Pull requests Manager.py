@@ -167,24 +167,24 @@ def resolver_conflictos_tests_to_run(archivo):
 
         resolved_lines = []
         in_conflict = False
-        conflict_section = []
+        current_section = []  # Almacena líneas de una sección de conflicto
 
         for line in lines:
             if line.startswith("<<<<<<<"):
                 in_conflict = True
-                conflict_section = []  # Inicializa la sección de conflicto
+                current_section = []  # Inicializa la sección de conflicto
             elif line.startswith("======="):
-                # Aquí terminan las líneas de la primera sección en conflicto
-                conflict_section.append(line.strip())
+                # Termina la primera parte del conflicto, comienza la segunda
+                continue
             elif line.startswith(">>>>>>>"):
-                # Final del conflicto. Aceptar ambas secciones.
+                # Final del conflicto, resolver aceptando ambas secciones
                 in_conflict = False
-                resolved_lines.extend(conflict_section)  # Mantener ambas partes
-                conflict_section = []
+                resolved_lines.extend(current_section)
+                current_section = []
             else:
                 if in_conflict:
-                    # Agregar línea en conflicto
-                    conflict_section.append(line.strip())
+                    # Agregar línea en conflicto a la sección actual
+                    current_section.append(line.strip())
                 else:
                     # Línea fuera de conflicto, agregarla al resultado
                     resolved_lines.append(line.strip())
@@ -199,6 +199,7 @@ def resolver_conflictos_tests_to_run(archivo):
     except Exception as e:
         print(f"Error resolviendo conflictos en {archivo}: {e}")
         return False
+
 
 def realizar_cherry_pick_y_validar(repo, commit_id, pr_id):
     try:
@@ -261,6 +262,7 @@ def verificar_cambios_integrados(pull_request_file, local_diff_file, repo_path, 
     """
     Verifica si los cambios de una pull request están correctamente integrados en los archivos locales,
     manejando líneas movidas y verificando el contexto de líneas añadidas y eliminadas.
+    Archivos nuevos y eliminados son excluidos de la validación.
     """
     try:
         # Leer los archivos de diferencias
@@ -272,21 +274,26 @@ def verificar_cambios_integrados(pull_request_file, local_diff_file, repo_path, 
         current_file = None
         current_context = []
         is_new_file = False
+        is_deleted_file = False
 
         for line in pr_lines:
             if line.startswith("diff --git"):
-                # Guardar los cambios del archivo actual
-                if current_file and not is_new_file:
+                # Guardar los cambios del archivo actual si no es nuevo o eliminado
+                if current_file and not is_new_file and not is_deleted_file:
                     file_changes[current_file]["removed_with_context"] = file_changes[current_file].get("removed_with_context", [])
                     file_changes[current_file]["added_with_context"] = file_changes[current_file].get("added_with_context", [])
-                # Detectar nuevo archivo
+                
+                # Detectar archivo nuevo o eliminado
                 is_new_file = False
+                is_deleted_file = False
                 current_file = os.path.normpath(line.split()[-1].replace("b/", "").strip())
                 file_changes[current_file] = {"added_with_context": [], "removed_with_context": []}
                 current_context = []
             elif "new file mode" in line:
                 is_new_file = True
-            elif line.startswith('+') and not line.startswith('+++') and not is_new_file:
+            elif "deleted file mode" in line:
+                is_deleted_file = True
+            elif line.startswith('+') and not line.startswith('+++') and not is_new_file and not is_deleted_file:
                 # Guardar la línea añadida con su contexto
                 context_before = current_context[-3:] if len(current_context) >= 3 else current_context
                 context_after = []  # Se llenará con próximas líneas reales
@@ -295,7 +302,7 @@ def verificar_cambios_integrados(pull_request_file, local_diff_file, repo_path, 
                     "context_before": context_before,
                     "context_after": context_after
                 })
-            elif line.startswith('-') and not line.startswith('---') and not is_new_file:
+            elif line.startswith('-') and not line.startswith('---') and not is_new_file and not is_deleted_file:
                 # Ignorar líneas eliminadas para el contexto
                 continue
             elif current_file and not (
@@ -309,8 +316,8 @@ def verificar_cambios_integrados(pull_request_file, local_diff_file, repo_path, 
                     if len(added["context_after"]) < 3:
                         added["context_after"].append(line.strip())
 
-        # Guardar los cambios del último archivo si no es nuevo
-        if current_file and not is_new_file:
+        # Guardar los cambios del último archivo si no es nuevo o eliminado
+        if current_file and not is_new_file and not is_deleted_file:
             file_changes[current_file]["removed_with_context"] = file_changes[current_file].get("removed_with_context", [])
             file_changes[current_file]["added_with_context"] = file_changes[current_file].get("added_with_context", [])
 
@@ -369,6 +376,7 @@ def verificar_cambios_integrados(pull_request_file, local_diff_file, repo_path, 
     except Exception as e:
         print(f"{Fore.RED}Error verificando los cambios: {e}{Style.RESET_ALL}")
         return False
+
 
 def contar_lineas_modificadas():
     try:
@@ -434,15 +442,16 @@ def eliminar_lineas_duplicadas(archivo):
 
 def ejecutar_pre_push():
     """
-    Pregunta si se desea desplegar en QA o PROD, ejecuta los comandos correspondientes,
-    y permite repetir el despliegue si es necesario.
+    Pregunta si se desea desplegar en QA, PROD, o terminar el bucle para continuar con el script.
+    Permite repetir el despliegue si es necesario.
     """
     while True:
         try:
             print("\nSeleccione una opción:")
             print("1. QA")
             print("2. PROD")
-            opcion = input("Ingrese el número de la opción (1 o 2): ").strip()
+            print("3. Terminar y continuar con el script")
+            opcion = input("Ingrese el número de la opción (1, 2 o 3): ").strip()
 
             if opcion == "1":
                 print("Lanzando comandos para QA...")
@@ -458,8 +467,11 @@ def ejecutar_pre_push():
                     "sfdx sgd:source:delta -f origin/master -o deploy-manifest --ignore .deltaignore -W",
                     "sfdx force:source:deploy --target-org IBD-prod -x deploy-manifest/package/package.xml --postdestructivechanges deploy-manifest/destructiveChanges/destructiveChanges.xml --wait 120 --ignorewarnings --json --verbose -c"
                 ]
+            elif opcion == "3":
+                print("Terminando el bucle y continuando con el script...")
+                break
             else:
-                print("Opción no válida. Por favor, elija 1 o 2.")
+                print("Opción no válida. Por favor, elija 1, 2 o 3.")
                 continue
 
             # Ejecutar los comandos seleccionados
@@ -475,7 +487,6 @@ def ejecutar_pre_push():
         except Exception as e:
             print(f"Error ejecutando los comandos: {e}")
             continue
-
 
 def hacer_push_y_abrir_pr(repo):
     try:
