@@ -9,8 +9,7 @@ init(autoreset=True)
 
 # Configuración principal
 REPO_PATH = "C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx"  # Cambia por la ruta local de tu repositorio
-PULL_REQUESTS = [9089, 9057, 9081, 9044,9065 ]  # Lista de IDs de las Pull Requests.
-
+PULL_REQUESTS = [9149, 9050, 9077, 9080, 9014]  # Lista de IDs de las Pull Requests.
 
 #Para los hotfixes, basta con ir a las PR merged e ir sacando las PR
 
@@ -203,8 +202,7 @@ def resolver_conflictos_tests_to_run(archivo):
         return False
 
 
-
-def realizar_cherry_pick_y_validar(repo, commit_id, pr_id): 
+def realizar_cherry_pick_y_validar(repo, commit_id, pr_id):
     try:
         print(f"Realizando cherry-pick del commit {commit_id}...")
         command = f'git cherry-pick -x --no-commit -m 1 {commit_id}'
@@ -239,15 +237,7 @@ def realizar_cherry_pick_y_validar(repo, commit_id, pr_id):
             export_diff_to_file(repo, f"{commit_id}^1", commit_id, original_diff_file)
             export_diff_to_file(repo, None, None, local_diff_file, cached=True)
             contar_lineas_modificadas()
-            
-            if not compare_diff_files_with_context(original_diff_file, local_diff_file):
-                # Preguntar si desea continuar tras revisar las discrepancias
-                print("\n¡Se detectaron discrepancias en los cambios!")
-                print(f"Por favor, revise el archivo de diferencias: {os.path.abspath('diferencias_reportadas.txt')}")
-                continuar = input("¿Desea continuar a pesar de las discrepancias? (s/n): ").strip().lower()
-                if continuar != "s":
-                    raise Exception("Discrepancias detectadas. Proceso abortado por el usuario.")
-            else:
+            if compare_diff_files_with_context(original_diff_file, local_diff_file):
                 print("\033[32m\nNo se encontraron discrepancias.\033[0m")
                 print("Realizando commit...")
                 command = f'git commit --no-verify --no-edit'
@@ -255,7 +245,7 @@ def realizar_cherry_pick_y_validar(repo, commit_id, pr_id):
                 break
 
             print("\nValidando si los cambios de la pull request están correctamente integrados en el archivo local...")
-            if verificar_cambios_integrados(pull_request_file="original_diff.txt", local_diff_file="local_diff.txt", repo_path=REPO_PATH, output_file="diferencias_reportadas.txt"):
+            if verificar_cambios_integrados(pull_request_file="original_diff.txt",local_diff_file="local_diff.txt",repo_path=REPO_PATH,output_file="diferencias_reportadas.txt"):
                 print("\033[32mLos cambios parecen estar integrados correctamente.\033[0m")
                 print("Realizando commit...")
                 command = f'git commit --no-verify'
@@ -272,67 +262,41 @@ def realizar_cherry_pick_y_validar(repo, commit_id, pr_id):
 def verificar_cambios_integrados(pull_request_file, local_diff_file, repo_path, output_file="diferencias_reportadas.txt"):
     """
     Verifica si los cambios de una pull request están correctamente integrados en los archivos locales,
-    manejando líneas movidas y verificando el contexto de líneas añadidas y eliminadas.
-    Archivos nuevos y eliminados son excluidos de la validación.
+    incluyendo la detección de líneas movidas. Ignora los archivos que no existen en el sistema local.
+
+    :param pull_request_file: Ruta al archivo con los cambios de la pull request (original_diff.txt).
+    :param local_diff_file: Ruta al archivo con los cambios locales (local_diff.txt).
+    :param repo_path: Ruta al repositorio para localizar los archivos afectados.
+    :param output_file: Ruta del archivo donde exportar las discrepancias detectadas.
+    :return: True si todos los cambios están integrados, False si hay discrepancias.
     """
     try:
         # Leer los archivos de diferencias
         with open(pull_request_file, "r", encoding="utf-8") as pr_file:
             pr_lines = pr_file.readlines()
 
-        # Extraer líneas añadidas y eliminadas junto con su contexto
+        # Extraer líneas añadidas (verdes) y eliminadas (rojas)
+        added_lines = {line[1:].strip() for line in pr_lines if line.startswith('+') and not line.startswith('+++')}
+        removed_lines = {line[1:].strip() for line in pr_lines if line.startswith('-') and not line.startswith('---')}
+
+        # Identificar líneas movidas (presentes tanto en añadidas como en eliminadas)
+        moved_lines = removed_lines & added_lines
+        removed_lines -= moved_lines  # Excluir líneas movidas de las eliminadas
+
+        # Identificar los archivos afectados
         file_changes = {}
         current_file = None
-        current_context = []
-        is_new_file = False
-        is_deleted_file = False
-
         for line in pr_lines:
             if line.startswith("diff --git"):
-                # Guardar los cambios del archivo actual si no es nuevo o eliminado
-                if current_file and not is_new_file and not is_deleted_file:
-                    file_changes[current_file]["removed_with_context"] = file_changes[current_file].get("removed_with_context", [])
-                    file_changes[current_file]["added_with_context"] = file_changes[current_file].get("added_with_context", [])
-                
-                # Detectar archivo nuevo o eliminado
-                is_new_file = False
-                is_deleted_file = False
-                current_file = os.path.normpath(line.split()[-1].replace("b/", "").strip())
-                file_changes[current_file] = {"added_with_context": [], "removed_with_context": []}
-                current_context = []
-            elif "new file mode" in line:
-                is_new_file = True
-            elif "deleted file mode" in line:
-                is_deleted_file = True
-            elif line.startswith('+') and not line.startswith('+++') and not is_new_file and not is_deleted_file:
-                # Guardar la línea añadida con su contexto
-                context_before = current_context[-3:] if len(current_context) >= 3 else current_context
-                context_after = []  # Se llenará con próximas líneas reales
-                file_changes[current_file]["added_with_context"].append({
-                    "line": line[1:].strip(),
-                    "context_before": context_before,
-                    "context_after": context_after
-                })
-            elif line.startswith('-') and not line.startswith('---') and not is_new_file and not is_deleted_file:
-                # Ignorar líneas eliminadas para el contexto
-                continue
-            elif current_file and not (
-                line.startswith("@@") or line.startswith("+++")
-                or line.startswith("index") or line.startswith("---")
-            ):
-                # Actualizar contexto para líneas posteriores, ignorando metadatos y eliminadas
-                current_context.append(line.strip())
-                # Añadir contexto a las últimas líneas añadidas
-                for added in file_changes[current_file]["added_with_context"][-3:]:
-                    if len(added["context_after"]) < 3:
-                        added["context_after"].append(line.strip())
+                file_path = line.split()[-1].replace("b/", "").strip()
+                current_file = os.path.normpath(file_path)
+                file_changes[current_file] = {"added": set(), "removed": set()}
+            elif line.startswith('+') and not line.startswith('+++'):
+                file_changes[current_file]["added"].add(line[1:].strip())
+            elif line.startswith('-') and not line.startswith('---'):
+                file_changes[current_file]["removed"].add(line[1:].strip())
 
-        # Guardar los cambios del último archivo si no es nuevo o eliminado
-        if current_file and not is_new_file and not is_deleted_file:
-            file_changes[current_file]["removed_with_context"] = file_changes[current_file].get("removed_with_context", [])
-            file_changes[current_file]["added_with_context"] = file_changes[current_file].get("added_with_context", [])
-
-        # Crear reporte detallado
+        # Crear un reporte detallado
         discrepancies = []
         discrepancies.append(f"Reporte de validación entre {pull_request_file} y {local_diff_file}\n")
         discrepancies.append("=" * 80 + "\n")
@@ -341,41 +305,28 @@ def verificar_cambios_integrados(pull_request_file, local_diff_file, repo_path, 
 
         for file, changes in file_changes.items():
             file_path = os.path.join(repo_path, file)
-
             # Ignorar archivos que no existen
             if not os.path.exists(file_path):
                 continue
 
             with open(file_path, "r", encoding="utf-8") as f:
-                local_file_lines = [line.strip() for line in f.readlines()]
+                local_file_content = {line.strip() for line in f.readlines()}
 
-            # Validar líneas añadidas basadas en contexto
-            for added in changes["added_with_context"]:
-                line = added["line"]
-                context_before = added["context_before"]
-                context_after = added["context_after"]
+            # Verificar líneas añadidas
+            missing_added = changes["added"] - local_file_content
+            if missing_added:
+                all_changes_integrated = False
+                discrepancies.append(f"⚠ Líneas añadidas que faltan en el archivo \"{file_path}\":\n")
+                for line in missing_added:
+                    discrepancies.append(f"  + {line}\n")
 
-                if line not in local_file_lines:
-                    all_changes_integrated = False
-                    discrepancies.append(
-                        f"⚠ Línea añadida no encontrada en el archivo \"{file_path}\" con su contexto esperado:\n"
-                        f"  Línea: {line}\n"
-                        f"  Contexto Antes: {context_before}\n"
-                        f"  Contexto Después: {context_after}\n"
-                    )
-                else:
-                    index = local_file_lines.index(line)
-                    before_match = local_file_lines[max(0, index - len(context_before)):index] == context_before
-                    after_match = local_file_lines[index + 1:index + 1 + len(context_after)] == context_after
-
-                    if not before_match or not after_match:
-                        all_changes_integrated = False
-                        discrepancies.append(
-                            f"⚠ Línea añadida encontrada pero fuera de contexto en el archivo \"{file_path}\":\n"
-                            f"  Línea: {line}\n"
-                            f"  Contexto Antes: {context_before}\n"
-                            f"  Contexto Después: {context_after}\n"
-                        )
+            # Verificar líneas eliminadas, excluyendo líneas movidas
+            present_removed = (changes["removed"] - moved_lines) & local_file_content
+            if present_removed:
+                all_changes_integrated = False
+                discrepancies.append(f"⚠ Líneas eliminadas que aún están presentes en el archivo \"{file_path}\":\n")
+                for line in present_removed:
+                    discrepancies.append(f"  - {line}\n")
 
         # Exportar el reporte a un archivo
         with open(output_file, "w", encoding="utf-8") as report_file:
@@ -451,54 +402,6 @@ def eliminar_lineas_duplicadas(archivo):
     except Exception as e:
         print(f"Error procesando el archivo {archivo}: {e}")
 
-def ejecutar_pre_push():
-    """
-    Pregunta si se desea desplegar en QA, PROD, o terminar el bucle para continuar con el script.
-    Permite repetir el despliegue si es necesario.
-    """
-    while True:
-        try:
-            print("\nSeleccione una opción:")
-            print("1. QA")
-            print("2. PROD")
-            print("3. Terminar y continuar con el script")
-            opcion = input("Ingrese el número de la opción (1, 2 o 3): ").strip()
-
-            if opcion == "1":
-                print("Lanzando comandos para QA...")
-                comandos = [
-                    "git fetch --all",
-                    "sfdx sgd:source:delta -f origin/develop -o deploy-manifest --ignore .deltaignore -W",
-                    "sfdx force:source:deploy --target-org QA-IBD -x deploy-manifest/package/package.xml --postdestructivechanges deploy-manifest/destructiveChanges/destructiveChanges.xml --wait 120 --ignorewarnings --json --verbose -c"
-                ]
-            elif opcion == "2":
-                print("Lanzando comandos para PROD...")
-                comandos = [
-                    "git fetch --all",
-                    "sfdx sgd:source:delta -f origin/master -o deploy-manifest --ignore .deltaignore -W",
-                    "sfdx force:source:deploy --target-org IBD-prod -x deploy-manifest/package/package.xml --postdestructivechanges deploy-manifest/destructiveChanges/destructiveChanges.xml --wait 120 --ignorewarnings --json --verbose -c"
-                ]
-            elif opcion == "3":
-                print("Terminando el bucle y continuando con el script...")
-                break
-            else:
-                print("Opción no válida. Por favor, elija 1, 2 o 3.")
-                continue
-
-            # Ejecutar los comandos seleccionados
-            for comando in comandos:
-                print(f"Ejecutando: {comando}")
-                run_command(comando, cwd=REPO_PATH)
-
-            # Preguntar si se desea repetir los comandos
-            repetir = input("¿Desea lanzar los comandos nuevamente? (s/n): ").strip().lower()
-            if repetir != "s":
-                print("Procediendo con el proceso normal...")
-                break
-        except Exception as e:
-            print(f"Error ejecutando los comandos: {e}")
-            continue
-
 def hacer_push_y_abrir_pr(repo):
     try:
         current_branch = repo.git.rev_parse("--abbrev-ref", "HEAD")
@@ -569,7 +472,7 @@ def main():
         print("\033[33mRecuerda copiar de las RN la tabla verde + sus pasos manuales. Revisa también la hoja de ProcessBuilder_Flow.\033[0m")
         print("\033[33mCambia el estado de la solicitud en el teams IBD si no quedan más PR\033[0m")
         input("Presiona ENTER para proceder con la siguiente PR tras hacer commit.")
-    ejecutar_pre_push()
+    
     hacer_push_y_abrir_pr(repo)
 
 if __name__ == "__main__":
