@@ -9,9 +9,10 @@ init(autoreset=True)
 
 # Configuración principal
 REPO_PATH = "C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx"  # Cambia por la ruta local de tu repositorio
-PULL_REQUESTS = [9149, 9050, 9077, 9080, 9014]  # Lista de IDs de las Pull Requests.
-
+PULL_REQUESTS = [9149, 9050, 9077, 9080]  # Lista de IDs de las Pull Requests.
+	
 #Para los hotfixes, basta con ir a las PR merged e ir sacando las PR
+
 
 def run_command(command, cwd=None, ignore_errors=False):
     result = subprocess.run(command, cwd=cwd, capture_output=True, text=True, shell=True)
@@ -152,69 +153,11 @@ def compare_diff_files_with_context(file1, file2):
         print(f"Error comparando archivos: {e}")
         return False
 
-def resolver_conflictos_tests_to_run(archivo):
-    """
-    Resolver automáticamente los conflictos en el archivo `config/tests-to-run.list` 
-    aceptando únicamente las líneas añadidas y omitiendo las eliminadas.
-    """
-    try:
-        if not os.path.exists(archivo):
-            print(f"El archivo {archivo} no existe. No hay conflictos que resolver.")
-            return False
-
-        with open(archivo, "r", encoding="utf-8") as f:
-            lines = f.readlines()
-
-        resolved_lines = []
-        in_conflict = False
-        current_section = []  # Almacena líneas de una sección de conflicto
-
-        for line in lines:
-            if line.startswith("<<<<<<<"):
-                in_conflict = True
-                current_section = []  # Inicializa la sección de conflicto
-            elif line.startswith("======="):
-                # Termina la primera parte del conflicto, comienza la segunda
-                continue
-            elif line.startswith(">>>>>>>"):
-                # Final del conflicto, resolver aceptando únicamente líneas nuevas
-                in_conflict = False
-                # Filtrar solo las líneas que no comienzan con "-"
-                resolved_lines.extend([l for l in current_section if not l.startswith("-")])
-                current_section = []
-            else:
-                if in_conflict:
-                    # Agregar línea en conflicto a la sección actual
-                    current_section.append(line.strip())
-                else:
-                    # Línea fuera de conflicto, agregarla al resultado
-                    resolved_lines.append(line.strip())
-
-        # Sobrescribir el archivo con los cambios resueltos
-        with open(archivo, "w", encoding="utf-8") as f:
-            f.write("\n".join(resolved_lines) + "\n")
-
-        print(f"Conflictos resueltos automáticamente en el archivo: {archivo}")
-        return True
-
-    except Exception as e:
-        print(f"Error resolviendo conflictos en {archivo}: {e}")
-        return False
-
-
 def realizar_cherry_pick_y_validar(repo, commit_id, pr_id):
     try:
         print(f"Realizando cherry-pick del commit {commit_id}...")
         command = f'git cherry-pick -x --no-commit -m 1 {commit_id}'
         run_command(command, cwd=REPO_PATH, ignore_errors=True)
-        archivo_conflicto = os.path.join(REPO_PATH, "config/tests-to-run.list")
-        # Resolver automáticamente conflictos en `config/tests-to-run.list`
-        if os.path.exists(archivo_conflicto):
-            print("Detectando conflictos en config/tests-to-run.list...")
-            if resolver_conflictos_tests_to_run(archivo_conflicto):
-                run_command(f"git add {archivo_conflicto}", cwd=REPO_PATH)
-                print(f"Conflictos resueltos automáticamente y {archivo_conflicto} añadido a staged changes.")
-
         eliminar_lineas_duplicadas(os.path.join(REPO_PATH, "config/tests-to-run.list"))
         # Usar rutas completas para los archivos de diferencias
         original_diff_file = os.path.join(REPO_PATH, "original_diff.txt")
@@ -448,12 +391,14 @@ def main():
 
             if len(commit_ids) > 1:
                 print("Múltiples commits encontrados. Seleccionando automáticamente el commit de merge más reciente:")
+                abrir_pull_request_en_navegador(pr_id)
                 for i, commit_id in enumerate(commit_ids, 1):
                     print(f"  {i}. {commit_id}")
                     commit_id = commit_ids[-1]  # Seleccionar el último commit (más reciente)
                     print(f"Seleccionado automáticamente el commit más reciente: {commit_id}")
             else:
                 commit_id = commit_ids[0]
+
             realizar_cherry_pick_y_validar(repo, commit_id, pr_id)
         except Exception as e:
             print(f"Error procesando la PR #{pr_id}: {e}")
