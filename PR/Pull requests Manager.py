@@ -10,11 +10,11 @@ init(autoreset=True)
 # Configuración principal
 REPO_PATH = "C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx"  # Cambia por la ruta local de tu repositorio
 PULL_REQUESTS = []  # Lista de IDs de las Pull Requests.
-	
+
 #Para los hotfixes, basta con ir a las PR merged e ir sacando las PR
 
 def run_command(command, cwd=None, ignore_errors=False):
-    result = subprocess.run(command, cwd=cwd, capture_output=True, =True, shell=True)
+    result = subprocess.run(command, cwd=cwd, capture_output=True, text=True, shell=True)
     if result.returncode != 0:
         if ignore_errors:
             print(f"")
