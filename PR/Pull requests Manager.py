@@ -9,7 +9,20 @@ init(autoreset=True)
 
 # Configuración principal
 REPO_PATH = "C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx"  # Cambia por la ruta local de tu repositorio
-PULL_REQUESTS = []  # Lista de IDs de las Pull Requests.
+PULL_REQUESTS = [9161, 9120, 9144, 8950, 9022]  # Lista de IDs de las Pull Requests.
+EXCLUDE_LINES = [
+    "<default>false</default>",
+    "<default>true</default>",
+    "+++ b/force-app/main/default",
+    "<value>",
+    "</value>",
+    "</customValue>",
+    "<customValue>",
+    "</CustomField>",
+    "<CustomField>",
+    "--- a/force-app/main/default",
+    "force-app/main/default"
+]  # Líneas a excluir en la comprobación de conflictos
 
 #Para los hotfixes, basta con ir a las PR merged e ir sacando las PR
 
@@ -22,6 +35,54 @@ def run_command(command, cwd=None, ignore_errors=False):
             print(f"Error ejecutando {command}:\n{result.stderr}")
             raise Exception(result.stderr)
     return result.stdout.strip()
+
+def compare_conflicts_with_original_diff(conflicts_file, original_diff_file):
+    try:
+        if not os.path.exists(conflicts_file):
+            print(f"Archivo de conflictos no encontrado: {conflicts_file}")
+            return
+
+        if not os.path.exists(original_diff_file):
+            print(f"Archivo original_diff no encontrado: {original_diff_file}")
+            return
+
+        # Leer conflictos y original_diff
+        with open(conflicts_file, "r", encoding="utf-8") as conflicts:
+            conflict_lines = set([line.strip() for line in conflicts.readlines()])
+
+        with open(original_diff_file, "r", encoding="utf-8") as original_diff:
+            original_lines = set([line.strip() for line in original_diff.readlines()])
+
+        # Filtrar líneas excluidas
+        original_lines = {
+            line for line in original_lines
+            if not any(exclude in line for exclude in EXCLUDE_LINES)
+        }
+
+        # Encontrar coincidencias
+        matching_lines = conflict_lines & original_lines
+
+        if matching_lines:
+            print("\033[33mCoincidencias encontradas en los conflictos:\033[0m")
+            for line in matching_lines:
+                print(f"  - {line}")
+        else:
+            print("\033[32mNo se encontraron coincidencias entre los conflictos y original_diff.txt.\033[0m")
+
+    except Exception as e:
+        print(f"Error comparando conflictos con original_diff: {e}")
+
+def export_conflicts_to_file(repo_path, conflicts_file):
+    try:
+        command = "git diff --diff-filter=U"
+        result = subprocess.run(command, cwd=repo_path, shell=True, capture_output=True, text=True)
+        if result.returncode != 0:
+            raise Exception(f"Error ejecutando git diff: {result.stderr}")
+        with open(conflicts_file, "w", encoding="utf-8") as f:
+            f.write(result.stdout)
+        print(f"Conflictos guardados en: {conflicts_file}")
+    except Exception as e:
+        print(f"Error guardando conflictos: {e}")
 
 def resolver_conflictos_tests_to_run(archivo):
     """
@@ -262,6 +323,7 @@ def realizar_cherry_pick_y_validar(repo, commit_id, pr_id):
         # Usar rutas completas para los archivos de diferencias
         original_diff_file = os.path.join(REPO_PATH, "original_diff.txt")
         local_diff_file = os.path.join(REPO_PATH, "local_diff.txt")
+        conflicts_file = os.path.join(REPO_PATH, "conflicts.txt")
 
         while True:
             # Verificar si hay conflictos
@@ -270,14 +332,18 @@ def realizar_cherry_pick_y_validar(repo, commit_id, pr_id):
 
             if conflicts:
                 print("\033[31m\nConflictos detectados:\033[0m")
+                export_diff_to_file(repo, f"{commit_id}^1", commit_id, original_diff_file)
                 abrir_pull_request_en_navegador(pr_id)
+                export_conflicts_to_file(REPO_PATH, conflicts_file)
+                compare_conflicts_with_original_diff(conflicts_file, original_diff_file)
+                
                 for conflict in conflicts:
                     print(f"  - {conflict.split()[-1]}")
                 input("\033[31mPresiona ENTER tras resolver los conflictos y añadir los archivos a staged changes\033[0m")
             else:
                 print("\033[32mNo se detectaron conflictos. Continuando...\033[0m")
 
-            export_diff_to_file(repo, f"{commit_id}^1", commit_id, original_diff_file)
+            
             export_diff_to_file(repo, None, None, local_diff_file, cached=True)
             contar_lineas_modificadas()
             if compare_diff_files_with_context(original_diff_file, local_diff_file):
@@ -506,8 +572,9 @@ def main():
         local_diff_file = os.path.join(REPO_PATH, "local_diff.txt")
         original_diff_file = os.path.join(REPO_PATH, "original_diff.txt")
         diferencias_reportadas_file = os.path.join(REPO_PATH, "diferencias_reportadas.txt")
+        conflicts_file = os.path.join(REPO_PATH, "conflicts.txt")
 
-        for diff_file in [local_diff_file, original_diff_file, diferencias_reportadas_file]:
+        for diff_file in [local_diff_file, original_diff_file, diferencias_reportadas_file, conflicts_file]:
             if os.path.exists(diff_file):
                 os.remove(diff_file)
       
