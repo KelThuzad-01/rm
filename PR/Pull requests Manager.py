@@ -9,7 +9,7 @@ init(autoreset=True)
 
 # Configuración principal
 REPO_PATH = "C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx"  # Cambia por la ruta local de tu repositorio
-PULL_REQUESTS = [9161, 9120, 9144, 8950, 9022]  # Lista de IDs de las Pull Requests.
+PULL_REQUESTS = [9264, 9256, 9266]  # Lista de IDs de las Pull Requests.
 EXCLUDE_LINES = [
     "<default>false</default>",
     "<default>true</default>",
@@ -21,7 +21,9 @@ EXCLUDE_LINES = [
     "</CustomField>",
     "<CustomField>",
     "--- a/force-app/main/default",
-    "force-app/main/default"
+    "force-app/main/default",
+    "<isActive>false</isActive>",
+    "<isActive>true</isActive>"
 ]  # Líneas a excluir en la comprobación de conflictos
 
 #Para los hotfixes, basta con ir a las PR merged e ir sacando las PR
@@ -48,10 +50,10 @@ def compare_conflicts_with_original_diff(conflicts_file, original_diff_file):
 
         # Leer conflictos y original_diff
         with open(conflicts_file, "r", encoding="utf-8") as conflicts:
-            conflict_lines = set([line.strip() for line in conflicts.readlines()])
+            conflict_lines = set([' '.join(line.strip().split()) for line in conflicts.readlines()])
 
         with open(original_diff_file, "r", encoding="utf-8") as original_diff:
-            original_lines = set([line.strip() for line in original_diff.readlines()])
+            original_lines = set([' '.join(line.strip().split()) for line in original_diff.readlines()])
 
         # Filtrar líneas excluidas
         original_lines = {
@@ -72,17 +74,30 @@ def compare_conflicts_with_original_diff(conflicts_file, original_diff_file):
     except Exception as e:
         print(f"Error comparando conflictos con original_diff: {e}")
 
+
 def export_conflicts_to_file(repo_path, conflicts_file):
     try:
+        # Ejecutar git diff para detectar conflictos
         command = "git diff --diff-filter=U"
-        result = subprocess.run(command, cwd=repo_path, shell=True, capture_output=True, text=True)
+        result = subprocess.run(
+            command,
+            cwd=repo_path,
+            shell=True,
+            capture_output=True,
+            text=True,
+            encoding="utf-8"  # Aseguramos que se use UTF-8
+        )
         if result.returncode != 0:
             raise Exception(f"Error ejecutando git diff: {result.stderr}")
+        
+        # Guardar el resultado en el archivo con codificación UTF-8
         with open(conflicts_file, "w", encoding="utf-8") as f:
             f.write(result.stdout)
+
         print(f"Conflictos guardados en: {conflicts_file}")
     except Exception as e:
         print(f"Error guardando conflictos: {e}")
+
 
 def resolver_conflictos_tests_to_run(archivo):
     """
@@ -322,8 +337,7 @@ def realizar_cherry_pick_y_validar(repo, commit_id, pr_id):
         eliminar_lineas_duplicadas(os.path.join(REPO_PATH, "config/tests-to-run.list"))
         # Usar rutas completas para los archivos de diferencias
         original_diff_file = os.path.join(REPO_PATH, "original_diff.txt")
-        local_diff_file = os.path.join(REPO_PATH, "local_diff.txt")
-        conflicts_file = os.path.join(REPO_PATH, "conflicts.txt")
+        export_diff_to_file(repo, f"{commit_id}^1", commit_id, original_diff_file)
 
         while True:
             # Verificar si hay conflictos
@@ -332,8 +346,8 @@ def realizar_cherry_pick_y_validar(repo, commit_id, pr_id):
 
             if conflicts:
                 print("\033[31m\nConflictos detectados:\033[0m")
-                export_diff_to_file(repo, f"{commit_id}^1", commit_id, original_diff_file)
                 abrir_pull_request_en_navegador(pr_id)
+                conflicts_file = os.path.join(REPO_PATH, "conflicts.txt")
                 export_conflicts_to_file(REPO_PATH, conflicts_file)
                 compare_conflicts_with_original_diff(conflicts_file, original_diff_file)
                 
@@ -343,7 +357,7 @@ def realizar_cherry_pick_y_validar(repo, commit_id, pr_id):
             else:
                 print("\033[32mNo se detectaron conflictos. Continuando...\033[0m")
 
-            
+            local_diff_file = os.path.join(REPO_PATH, "local_diff.txt")
             export_diff_to_file(repo, None, None, local_diff_file, cached=True)
             contar_lineas_modificadas()
             if compare_diff_files_with_context(original_diff_file, local_diff_file):
@@ -540,6 +554,8 @@ def main():
     PULL_REQUESTS.sort()
     command = f'git fetch --all'
     run_command(command, cwd=REPO_PATH, ignore_errors=True)
+    command = f'git pull'
+    run_command(command, cwd=REPO_PATH, ignore_errors=True)
     repo = Repo(REPO_PATH)
     for pr_id in PULL_REQUESTS:
         try:
@@ -578,7 +594,6 @@ def main():
             if os.path.exists(diff_file):
                 os.remove(diff_file)
       
-        
         print(f"\033[34mFinalizada la PR #{pr_id}...\033[0m")
         print("\033[33mRecuerda copiar de las RN la tabla verde + sus pasos manuales. Revisa también la hoja de ProcessBuilder_Flow.\033[0m")
         print("\033[33mCambia el estado de la solicitud en el teams IBD si no quedan más PR\033[0m")
