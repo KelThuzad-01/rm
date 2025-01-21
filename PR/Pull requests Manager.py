@@ -9,8 +9,7 @@ init(autoreset=True)
 
 # Configuración principal
 REPO_PATH = "C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx"  # Cambia por la ruta local de tu repositorio
-PULL_REQUESTS = [8806, 9312, 9322
-]  # Lista de IDs de las Pull Requests.
+PULL_REQUESTS = [9275, 9318, 9317]  # Lista de IDs de las Pull Requests.
 
 EXCLUDE_LINES = [
     "<default>false</default>",
@@ -47,6 +46,7 @@ EXCLUDE_LINES = [
     "{",
     "else",
     "<locationY>",
+    "- <locationY>",
     "<locationX>",
     "<conditionLogic>",
     "<valueSettings>",
@@ -341,32 +341,39 @@ def resolver_conflictos_tests_to_run(archivo):
         return False
 
 def ejecutar_pre_push():
-    """
-    Ejecuta comandos de despliegue para QA o PROD según la selección del usuario.
-    """
-    try:
-        print("Selecciona el entorno de despliegue:")
-        print("1 - QA")
-        print("2 - PROD")
-        
-        opcion = input("Ingresa tu opción (1 o 2): ").strip()
+        try:
+        # Obtener la rama actual
+        result = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            cwd=REPO_PATH,
+            capture_output=True,
+            text=True
+        )
 
-        if opcion == "1":
-            print("\nSeleccionaste QA. Ejecutando comandos para QA...")
+        if result.returncode != 0:
+            print(f"Error obteniendo la rama actual: {result.stderr}")
+            return
+
+        current_branch = result.stdout.strip()
+        print(f"Estás en la rama: {current_branch}")
+
+        # Detectar entorno basado en la rama
+        if "UAT2" in current_branch:
+            print("\nDetectado entorno UAT2. Ejecutando comandos para QA...")
             comandos = [
                 "git fetch --all",
                 "sfdx sgd:source:delta -f origin/develop -o deploy-manifest --ignore .deltaignore -W",
                 "sfdx force:source:deploy --target-org QA-IBD -x deploy-manifest/package/package.xml --postdestructivechanges deploy-manifest/destructiveChanges/destructiveChanges.xml --wait 120 --ignorewarnings --json --verbose -c"
             ]
-        elif opcion == "2":
-            print("\nSeleccionaste PROD. Ejecutando comandos para PROD...")
+        elif "PROD" in current_branch:
+            print("\nDetectado entorno PROD. Ejecutando comandos para PROD...")
             comandos = [
                 "git fetch --all",
                 "sfdx sgd:source:delta -f origin/master -o deploy-manifest --ignore .deltaignore -W",
                 "sfdx force:source:deploy --target-org IBD-prod -x deploy-manifest/package/package.xml --postdestructivechanges deploy-manifest/destructiveChanges/destructiveChanges.xml --wait 120 --ignorewarnings --json --verbose -c"
             ]
         else:
-            print("\nOpción no válida. Por favor, selecciona 1 o 2.")
+            print("\nNo se detectó un entorno compatible en la rama actual. Por favor, verifica la rama.")
             return
 
         # Ejecutar comandos
@@ -381,6 +388,7 @@ def ejecutar_pre_push():
 
     except Exception as e:
         print(f"Error en ejecutar_pre_push: {e}")
+
 
 
 def export_diff_to_file(repo, commit_base, commit_to, output_file, cached=False):
