@@ -9,7 +9,7 @@ init(autoreset=True)
 
 # Configuración principal
 REPO_PATH = "C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx"  # Cambia por la ruta local de tu repositorio
-PULL_REQUESTS = [9275, 9318, 9317]  # Lista de IDs de las Pull Requests.
+PULL_REQUESTS = [9303]  # Lista de IDs de las Pull Requests.
 
 EXCLUDE_LINES = [
     "<default>false</default>",
@@ -341,7 +341,7 @@ def resolver_conflictos_tests_to_run(archivo):
         return False
 
 def ejecutar_pre_push():
-        try:
+    try:
         # Obtener la rama actual
         result = subprocess.run(
             ["git", "rev-parse", "--abbrev-ref", "HEAD"],
@@ -388,7 +388,6 @@ def ejecutar_pre_push():
 
     except Exception as e:
         print(f"Error en ejecutar_pre_push: {e}")
-
 
 
 def export_diff_to_file(repo, commit_base, commit_to, output_file, cached=False):
@@ -592,16 +591,6 @@ def realizar_cherry_pick_y_validar(repo, commit_id, pr_id):
         contar_lineas_modificadas()
 
 def verificar_cambios_integrados(pull_request_file, local_diff_file, repo_path, output_file="diferencias_reportadas.txt"):
-    """
-    Verifica si los cambios de una pull request están correctamente integrados en los archivos locales,
-    incluyendo la detección de líneas movidas. Ignora los archivos que no existen en el sistema local.
-
-    :param pull_request_file: Ruta al archivo con los cambios de la pull request (original_diff.txt).
-    :param local_diff_file: Ruta al archivo con los cambios locales (local_diff.txt).
-    :param repo_path: Ruta al repositorio para localizar los archivos afectados.
-    :param output_file: Ruta del archivo donde exportar las discrepancias detectadas.
-    :return: True si todos los cambios están integrados, False si hay discrepancias.
-    """
     try:
         # Leer los archivos de diferencias
         with open(pull_request_file, "r", encoding="utf-8") as pr_file:
