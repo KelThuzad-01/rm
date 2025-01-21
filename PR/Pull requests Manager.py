@@ -9,22 +9,69 @@ init(autoreset=True)
 
 # Configuración principal
 REPO_PATH = "C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx"  # Cambia por la ruta local de tu repositorio
-PULL_REQUESTS = [9264, 9256, 9266]  # Lista de IDs de las Pull Requests.
+PULL_REQUESTS = [8806, 9312, 9322
+]  # Lista de IDs de las Pull Requests.
+
 EXCLUDE_LINES = [
     "<default>false</default>",
     "<default>true</default>",
-    "+++ b/force-app/main/default",
+    "+++ b/",
     "<value>",
     "</value>",
     "</customValue>",
     "<customValue>",
     "</CustomField>",
     "<CustomField>",
-    "--- a/force-app/main/default",
+    "</rules>",
+    "<rules>",
+    "<rightValue>",
+    "</rightValue>",
+    "</decisions>",
+    "<decisions>",
+    "</conditions>",
+    "<operator>",
+    "</operator>"
+    "--- a/",
     "force-app/main/default",
     "<isActive>false</isActive>",
-    "<isActive>true</isActive>"
-]  # Líneas a excluir en la comprobación de conflictos
+    "<isActive>true</isActive>",
+    "<editable>",
+    "<fieldPermissions>",
+    "</fieldPermissions>",
+    "<readable>",
+    "force-app",
+    " force-app",
+    ".xml",
+    "diff --cc",
+    "}",
+    "{",
+    "else",
+    "<locationY>",
+    "<locationX>",
+    "<conditionLogic>",
+    "<valueSettings>",
+    "<picklistValues>",
+    "<standardValue>",
+    "</values>",
+    "<values>",
+    "</standardValue>",
+    "</picklistValues>",
+    "<inputAssignments>",
+    "</inputAssignments>",
+    " <locationY>",
+    "<collectionProcessors>",
+    " <collectionProcessors>",
+    " <rightValue>",
+    " </rightValue>",
+    "<editable>false</editable>",
+    "<readable>true</readable>",
+    " <default>false</default>",
+    " <values>",
+    "<connector>",
+    "</connector>",
+    "<assignmentItems>",
+    "</assignmentItems>"
+]  # Líneas a excluir en la comprobación de conflictos y diferencias reportadas
 
 #Para los hotfixes, basta con ir a las PR merged e ir sacando las PR
 
@@ -38,7 +85,7 @@ def run_command(command, cwd=None, ignore_errors=False):
             raise Exception(result.stderr)
     return result.stdout.strip()
 
-def compare_conflicts_with_original_diff(conflicts_file, original_diff_file):
+
     try:
         if not os.path.exists(conflicts_file):
             print(f"Archivo de conflictos no encontrado: {conflicts_file}")
@@ -48,12 +95,23 @@ def compare_conflicts_with_original_diff(conflicts_file, original_diff_file):
             print(f"Archivo original_diff no encontrado: {original_diff_file}")
             return
 
-        # Leer conflictos y original_diff
-        with open(conflicts_file, "r", encoding="utf-8") as conflicts:
-            conflict_lines = set([' '.join(line.strip().split()) for line in conflicts.readlines()])
+        def clean_lines(lines):
+            """Limpia y normaliza las líneas para comparación."""
+            cleaned = []
+            for line in lines:
+                line = line.strip()
+                if line.startswith('<<<<<<<') or line.startswith('=======') or line.startswith('>>>>>>>'):
+                    continue
+                cleaned.append(' '.join(line.split()))  # Normaliza espacios
+            return set(cleaned)
 
+        # Leer y limpiar conflictos
+        with open(conflicts_file, "r", encoding="utf-8") as conflicts:
+            conflict_lines = clean_lines(conflicts.readlines())
+
+        # Leer y limpiar original_diff
         with open(original_diff_file, "r", encoding="utf-8") as original_diff:
-            original_lines = set([' '.join(line.strip().split()) for line in original_diff.readlines()])
+            original_lines = clean_lines(original_diff.readlines())
 
         # Filtrar líneas excluidas
         original_lines = {
@@ -71,6 +129,140 @@ def compare_conflicts_with_original_diff(conflicts_file, original_diff_file):
         else:
             print("\033[32mNo se encontraron coincidencias entre los conflictos y original_diff.txt.\033[0m")
 
+            # Resolver conflictos utilizando "Accept Current"
+            try:
+                print("Resolviendo conflictos con la estrategia 'Accept Current'...")
+                command = "git diff --name-only --diff-filter=U"
+                result = subprocess.run(command, cwd=REPO_PATH, shell=True, capture_output=True, text=True, check=True)
+                files = result.stdout.strip().splitlines()
+
+                for file in files:
+                    resolve_command = f"git checkout --ours {file}"
+                    subprocess.run(resolve_command, cwd=REPO_PATH, shell=True, check=True)
+                    add_command = f"git add {file}"
+                    subprocess.run(add_command, cwd=REPO_PATH, shell=True, check=True)
+
+                print("\033[32mConflictos resueltos automáticamente con 'Accept Current' y añadidos al stage.\033[0m")
+            except subprocess.CalledProcessError as e:
+                print(f"\033[31mError al resolver conflictos automáticamente: {e}\033[0m")
+
+    except Exception as e:
+        print(f"Error comparando conflictos con original_diff: {e}")
+
+def compare_conflicts_with_original_diff(conflicts_file, original_diff_file):
+    try:
+        if not os.path.exists(conflicts_file):
+            print(f"Archivo de conflictos no encontrado: {conflicts_file}")
+            return
+
+        if not os.path.exists(original_diff_file):
+            print(f"Archivo original_diff no encontrado: {original_diff_file}")
+            return
+
+        def clean_line(line):
+            """Limpia y normaliza una línea para comparación."""
+            line = line.strip()
+            if line.startswith(('<<<<<<<', '=======', '>>>>>>>')):
+                return ""  # Ignorar marcas de conflicto
+            if line.startswith(('+', '-')):
+                line = line[1:]  # Remover prefijos '+' o '-'
+            return ' '.join(line.split())  # Normaliza espacios
+
+        # Leer y limpiar conflictos
+        with open(conflicts_file, "r", encoding="utf-8") as conflicts:
+            conflict_lines = {clean_line(line) for line in conflicts if clean_line(line)}
+
+        # Leer y limpiar original_diff
+        with open(original_diff_file, "r", encoding="utf-8") as original_diff:
+            original_lines = {clean_line(line) for line in original_diff if clean_line(line)}
+
+        # Filtrar líneas excluidas para comparación
+        filtered_original_lines = {
+            line for line in original_lines
+            if not any(exclude in line for exclude in EXCLUDE_LINES)
+        }
+
+        # Encontrar coincidencias
+        matching_lines = conflict_lines & filtered_original_lines
+
+        if matching_lines:
+            print("\033[33mCoincidencias encontradas en los conflictos:\033[0m")
+            for line in matching_lines:
+                print(f"  - {line}")
+
+        print("Resolviendo conflictos a nivel de bloque...")
+
+        # Procesar los archivos con conflictos
+        command = "git diff --name-only --diff-filter=U"
+        result = subprocess.run(command, cwd=REPO_PATH, shell=True, capture_output=True, text=True, check=True)
+        files = result.stdout.strip().splitlines()
+
+        for file in files:
+            file_path = os.path.join(REPO_PATH, file)
+            if not os.path.exists(file_path):
+                print(f"Archivo no encontrado: {file_path}")
+                continue
+
+            with open(file_path, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+
+            resolved_lines = []
+            in_conflict = False
+            current_conflict = []
+            has_conflict_marks = False  # Para rastrear si quedan conflictos en el archivo
+
+            for line in lines:
+                if line.startswith("<<<<<<<"):
+                    in_conflict = True
+                    current_conflict = [line]
+                    has_conflict_marks = True
+                    continue
+                elif line.startswith("======="):
+                    current_conflict.append(line)
+                    continue
+                elif line.startswith(">>>>>>>"):
+                    in_conflict = False
+                    current_conflict.append(line)
+
+                    # Verificar si el bloque tiene coincidencias
+                    conflict_content = {clean_line(l) for l in current_conflict}
+                    has_matching_lines = bool(conflict_content & filtered_original_lines)
+
+                    if has_matching_lines:
+                        # Mantener el bloque intacto si hay coincidencias
+                        resolved_lines.extend(current_conflict)
+                    else:
+                        # Resolver aceptando las líneas de "ours" únicamente
+                        for conflict_line in current_conflict:
+                            if conflict_line.startswith("<<<<<<<") or conflict_line.startswith("=======") or conflict_line.startswith(">>>>>>>"):
+                                continue
+                            if not conflict_line.startswith("        "):  # Aceptar líneas de "ours"
+                                resolved_lines.append(conflict_line)
+
+                    current_conflict = []
+                    continue
+
+                if in_conflict:
+                    current_conflict.append(line)
+                else:
+                    resolved_lines.append(line)
+
+            # Sobrescribir el archivo con las líneas resueltas si no tiene coincidencias
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.writelines(resolved_lines)
+
+            # Solo añadir al stage si no quedan marcas de conflicto
+            if not has_conflict_marks:
+                print(f"Resolviendo archivo: {file}")
+                add_command = f"git add {file}"
+                subprocess.run(add_command, cwd=REPO_PATH, shell=True, check=True)
+            else:
+                print(f"Archivo {file} contiene marcas de conflicto no resueltas y no será añadido al stage.")
+
+        print("\033[32mConflictos resueltos automáticamente, excepto aquellos con coincidencias.\033[0m")
+
+    except subprocess.CalledProcessError as e:
+        print(f"\033[31mError al resolver conflictos automáticamente: {e}\033[0m")
     except Exception as e:
         print(f"Error comparando conflictos con original_diff: {e}")
 
@@ -293,7 +485,7 @@ def compare_diff_files(original_diff_file, local_diff_file):
         print("No se encontraron discrepancias. Las diferencias coinciden exactamente.")
         contar_lineas_modificadas()
 
-def compare_diff_files_with_context(file1, file2):
+def compare_diff_files_with_context(file1, file2, output_file="diferencias_reportadas.txt"):
     try:
         with open(file1, "r", encoding="utf-8") as f1, open(file2, "r", encoding="utf-8") as f2:
             lines1 = [line for line in f1 if not line.startswith("@@")]
@@ -309,12 +501,23 @@ def compare_diff_files_with_context(file1, file2):
             )
             differences = list(diff)
 
-            if differences:
-                print("\n¡Se detectaron discrepancias!")
-                contar_lineas_modificadas()
+            # Filtrar diferencias excluidas
+            filtered_differences = [
+                line for line in differences
+                if not any(exclude in line for exclude in EXCLUDE_LINES)
+            ]
+
+            if filtered_differences:
+                print("\n¡Se detectaron discrepancias tras aplicar exclusiones!")
+
+                # Guardar diferencias en el archivo de reporte, excluyendo las líneas de EXCLUDE_LINES
+                with open(output_file, "w", encoding="utf-8") as report_file:
+                    report_file.writelines(filtered_differences)
+
+                print(f"\n{Fore.YELLOW}Reporte de discrepancias exportado a: {output_file}{Style.RESET_ALL}")
                 return False
             else:
-                print("\n¡No se detectaron discrepancias! Los cambios coinciden exactamente.")
+                print("\n¡No se detectaron discrepancias relevantes tras aplicar exclusiones!")
                 return True
     except Exception as e:
         print(f"Error comparando archivos: {e}")
@@ -354,8 +557,6 @@ def realizar_cherry_pick_y_validar(repo, commit_id, pr_id):
                 for conflict in conflicts:
                     print(f"  - {conflict.split()[-1]}")
                 input("\033[31mPresiona ENTER tras resolver los conflictos y añadir los archivos a staged changes\033[0m")
-            else:
-                print("\033[32mNo se detectaron conflictos. Continuando...\033[0m")
 
             local_diff_file = os.path.join(REPO_PATH, "local_diff.txt")
             export_diff_to_file(repo, None, None, local_diff_file, cached=True)
@@ -371,7 +572,7 @@ def realizar_cherry_pick_y_validar(repo, commit_id, pr_id):
             if verificar_cambios_integrados(pull_request_file="original_diff.txt",local_diff_file="local_diff.txt",repo_path=REPO_PATH,output_file="diferencias_reportadas.txt"):
                 print("\033[32mLos cambios parecen estar integrados correctamente.\033[0m")
                 print("Realizando commit...")
-                command = f'git commit --no-verify'
+                command = f'git commit --no-verify --no-edit'
                 run_command(command, cwd=REPO_PATH, ignore_errors=True)
                 break
 
