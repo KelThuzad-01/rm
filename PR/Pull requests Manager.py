@@ -8,8 +8,11 @@ from colorama import Fore, Style, init
 init(autoreset=True)
 
 # Configuración principal
-REPO_PATH = "C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx"  # Cambia por la ruta local de tu repositorio
-PULL_REQUESTS = [9303]  # Lista de IDs de las Pull Requests.
+REPO_PATH = "C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx"
+PULL_REQUESTS = [
+]  # Lista de IDs de las Pull Requests.
+
+
 
 EXCLUDE_LINES = [
     "<default>false</default>",
@@ -35,6 +38,12 @@ EXCLUDE_LINES = [
     "<isActive>false</isActive>",
     "<isActive>true</isActive>",
     "<editable>",
+    " - <editable>",
+    "  - <fieldPermissions>",
+    "  - <readable>true</readable>",
+    "  - </fieldPermissions>",
+    "  - <readable>true</readable>",
+    "  - <editable>false</editable>",
     "<fieldPermissions>",
     "</fieldPermissions>",
     "<readable>",
@@ -70,8 +79,37 @@ EXCLUDE_LINES = [
     "<connector>",
     "</connector>",
     "<assignmentItems>",
-    "</assignmentItems>"
-]  # Líneas a excluir en la comprobación de conflictos y diferencias reportadas
+    "</assignmentItems>",
+    "- <decisions>",
+    "  - <decisions>",
+    "  - <conditionLogic>and</conditionLogic>",
+    "  - </rules>",
+    "  - </rightValue>",
+    "  - <rightValue>",
+    "  - <booleanValue>true</booleanValue>",
+    "  - </conditions>",
+    "  - <operator>EqualTo</operator>",
+    "  - </decisions>",
+    "  - <rules>",
+    "  - <conditions>",
+    "  - <locationY>",
+    "  - <values>",
+    "  - <default>false</default>",
+    "  - +",
+    "  - );",
+    "  - <enabled>false</enabled>",
+    "  - <viewAllRecords>false</viewAllRecords>",
+    "  - <userPermissions>",
+    "  - </userPermissions>",
+    "  - ",
+    "  - <enabled>true</enabled>",
+    "  - <enabled>false</enabled>",
+    "  - </formulas>",
+    "  - <dataType>Boolean</dataType>",
+    "  - <formulas>",
+    ");",
+    "<conditionLogic>and</conditionLogic>"
+]  # Líneas a excluir en la comprobación de conflictos y diferencias reportadas, suelen repetirse en los XML
 
 #Para los hotfixes, basta con ir a las PR merged e ir sacando las PR
 
@@ -188,79 +226,7 @@ def compare_conflicts_with_original_diff(conflicts_file, original_diff_file):
         if matching_lines:
             print("\033[33mCoincidencias encontradas en los conflictos:\033[0m")
             for line in matching_lines:
-                print(f"  - {line}")
-
-        print("Resolviendo conflictos a nivel de bloque...")
-
-        # Procesar los archivos con conflictos
-        command = "git diff --name-only --diff-filter=U"
-        result = subprocess.run(command, cwd=REPO_PATH, shell=True, capture_output=True, text=True, check=True)
-        files = result.stdout.strip().splitlines()
-
-        for file in files:
-            file_path = os.path.join(REPO_PATH, file)
-            if not os.path.exists(file_path):
-                print(f"Archivo no encontrado: {file_path}")
-                continue
-
-            with open(file_path, "r", encoding="utf-8") as f:
-                lines = f.readlines()
-
-            resolved_lines = []
-            in_conflict = False
-            current_conflict = []
-            has_conflict_marks = False  # Para rastrear si quedan conflictos en el archivo
-
-            for line in lines:
-                if line.startswith("<<<<<<<"):
-                    in_conflict = True
-                    current_conflict = [line]
-                    has_conflict_marks = True
-                    continue
-                elif line.startswith("======="):
-                    current_conflict.append(line)
-                    continue
-                elif line.startswith(">>>>>>>"):
-                    in_conflict = False
-                    current_conflict.append(line)
-
-                    # Verificar si el bloque tiene coincidencias
-                    conflict_content = {clean_line(l) for l in current_conflict}
-                    has_matching_lines = bool(conflict_content & filtered_original_lines)
-
-                    if has_matching_lines:
-                        # Mantener el bloque intacto si hay coincidencias
-                        resolved_lines.extend(current_conflict)
-                    else:
-                        # Resolver aceptando las líneas de "ours" únicamente
-                        for conflict_line in current_conflict:
-                            if conflict_line.startswith("<<<<<<<") or conflict_line.startswith("=======") or conflict_line.startswith(">>>>>>>"):
-                                continue
-                            if not conflict_line.startswith("        "):  # Aceptar líneas de "ours"
-                                resolved_lines.append(conflict_line)
-
-                    current_conflict = []
-                    continue
-
-                if in_conflict:
-                    current_conflict.append(line)
-                else:
-                    resolved_lines.append(line)
-
-            # Sobrescribir el archivo con las líneas resueltas si no tiene coincidencias
-            with open(file_path, "w", encoding="utf-8") as f:
-                f.writelines(resolved_lines)
-
-            # Solo añadir al stage si no quedan marcas de conflicto
-            if not has_conflict_marks:
-                print(f"Resolviendo archivo: {file}")
-                add_command = f"git add {file}"
-                subprocess.run(add_command, cwd=REPO_PATH, shell=True, check=True)
-            else:
-                print(f"Archivo {file} contiene marcas de conflicto no resueltas y no será añadido al stage.")
-
-        print("\033[32mConflictos resueltos automáticamente, excepto aquellos con coincidencias.\033[0m")
-
+                print(f"  - {line}")   
     except subprocess.CalledProcessError as e:
         print(f"\033[31mError al resolver conflictos automáticamente: {e}\033[0m")
     except Exception as e:
@@ -362,15 +328,29 @@ def ejecutar_pre_push():
             print("\nDetectado entorno UAT2. Ejecutando comandos para QA...")
             comandos = [
                 "git fetch --all",
-                "sfdx sgd:source:delta -f origin/develop -o deploy-manifest --ignore .deltaignore -W",
-                "sfdx force:source:deploy --target-org QA-IBD -x deploy-manifest/package/package.xml --postdestructivechanges deploy-manifest/destructiveChanges/destructiveChanges.xml --wait 120 --ignorewarnings --json --verbose -c"
+                "sf sgd source delta --from origin/develop --output-dir deploy-manifest --ignore-file .deltaignore --ignore-whitespace",
+                "sf project deploy start --target-org QA-IBD --manifest deploy-manifest/package/package.xml -l NoTestRun --post-destructive-changes deploy-manifest/destructiveChanges/destructiveChanges.xml --ignore-warnings --dry-run"
             ]
         elif "PROD" in current_branch:
             print("\nDetectado entorno PROD. Ejecutando comandos para PROD...")
             comandos = [
                 "git fetch --all",
-                "sfdx sgd:source:delta -f origin/master -o deploy-manifest --ignore .deltaignore -W",
-                "sfdx force:source:deploy --target-org IBD-prod -x deploy-manifest/package/package.xml --postdestructivechanges deploy-manifest/destructiveChanges/destructiveChanges.xml --wait 120 --ignorewarnings --json --verbose -c"
+                "sf sgd source delta --from origin/master --output-dir deploy-manifest --ignore-file .deltaignore --ignore-whitespace",
+                "sf project deploy start --target-org IBD-prod --manifest deploy-manifest/package/package.xml -l NoTestRun --post-destructive-changes deploy-manifest/destructiveChanges/destructiveChanges.xml --ignore-warnings --dry-run"
+            ]
+        elif "mobility" in current_branch:
+            print("\nDetectado entorno mobility. Ejecutando comandos para mobility...")
+            comandos = [
+                "git fetch --all",
+                "sf sgd source delta --from origin/ci/mobility --output-dir deploy-manifest --ignore-file .deltaignore --ignore-whitespace",
+                "sf project deploy start --target-org mobility --manifest deploy-manifest/package/package.xml -l NoTestRun --post-destructive-changes deploy-manifest/destructiveChanges/destructiveChanges.xml --ignore-warnings --dry-run"
+            ]
+        elif "solar-develop" in current_branch:
+            print("\nDetectado entorno solar. Ejecutando comandos para solar...")
+            comandos = [
+                "git fetch --all",
+                "sf sgd source delta --from origin/ci/solar-develop --output-dir deploy-manifest --ignore-file .deltaignore --ignore-whitespace",
+                "sf project deploy start --target-org solar-develop --manifest deploy-manifest/package/package.xml -l NoTestRun --post-destructive-changes deploy-manifest/destructiveChanges/destructiveChanges.xml --ignore-warnings --dry-run"
             ]
         else:
             print("\nNo se detectó un entorno compatible en la rama actual. Por favor, verifica la rama.")
