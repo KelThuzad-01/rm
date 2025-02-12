@@ -6,8 +6,8 @@ let permissionSetPath = 'C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx\\force-ap
 // QA sfdx sgd:source:delta --from origin/develop --output C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx
 
 //PROD + QA
-let deployCommand = 'sf project deploy start --target-org IBD-prod --manifest C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx\\package\\package.xml --ignore-conflicts --ignore-warnings --dry-run';
-//let deployCommand = 'sf project deploy start --target-org QA-IBD --manifest C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx\\package\\package.xml --ignore-conflicts --ignore-warnings --dry-run';
+//let deployCommand = 'sf project deploy start --target-org IBD-prod --manifest C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx\\package\\package.xml --ignore-conflicts --ignore-warnings --dry-run';
+let deployCommand = 'sf project deploy start --target-org QA-IBD --manifest deploy-manifest/package/package.xml --post-destructive-changes deploy-manifest/destructiveChanges/destructiveChanges.xml --dry-run --wait 240 --ignore-warnings --concise --ignore-conflicts';
 
 let deleteScriptTemplate = 'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deletePermissionSetProfileFieldpermissionsReferencesByObjectOrField.mjs" "${profilePath}" "${fieldName}"';
 let deleteScriptTemplateRecordType = 'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deletePermissionSetProfileRecordTypepermissionsReferences.mjs" "${profilePath}" "${recordTypeName}"';

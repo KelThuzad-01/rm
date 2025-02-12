@@ -8,110 +8,27 @@ from colorama import Fore, Style, init
 init(autoreset=True)
 
 # Configuración principal
-REPO_PATH = "C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx"
+
 PULL_REQUESTS = [
+
 ]  # Lista de IDs de las Pull Requests.
 
-
+REPO_PATH = "C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx"
 
 EXCLUDE_LINES = [
-    "<default>false</default>",
-    "<default>true</default>",
-    "+++ b/",
-    "<value>",
-    "</value>",
-    "</customValue>",
-    "<customValue>",
-    "</CustomField>",
-    "<CustomField>",
-    "</rules>",
-    "<rules>",
-    "<rightValue>",
-    "</rightValue>",
-    "</decisions>",
-    "<decisions>",
-    "</conditions>",
-    "<operator>",
-    "</operator>"
-    "--- a/",
-    "force-app/main/default",
-    "<isActive>false</isActive>",
-    "<isActive>true</isActive>",
-    "<editable>",
-    " - <editable>",
-    "  - <fieldPermissions>",
-    "  - <readable>true</readable>",
-    "  - </fieldPermissions>",
-    "  - <readable>true</readable>",
-    "  - <editable>false</editable>",
-    "<fieldPermissions>",
-    "</fieldPermissions>",
-    "<readable>",
-    "force-app",
-    " force-app",
-    ".xml",
-    "diff --cc",
-    "}",
-    "{",
-    "else",
-    "<locationY>",
-    "- <locationY>",
-    "<locationX>",
-    "<conditionLogic>",
-    "<valueSettings>",
-    "<picklistValues>",
-    "<standardValue>",
-    "</values>",
-    "<values>",
-    "</standardValue>",
-    "</picklistValues>",
-    "<inputAssignments>",
-    "</inputAssignments>",
-    " <locationY>",
-    "<collectionProcessors>",
-    " <collectionProcessors>",
-    " <rightValue>",
-    " </rightValue>",
-    "<editable>false</editable>",
-    "<readable>true</readable>",
-    " <default>false</default>",
-    " <values>",
-    "<connector>",
-    "</connector>",
-    "<assignmentItems>",
-    "</assignmentItems>",
-    "- <decisions>",
-    "  - <decisions>",
-    "  - <conditionLogic>and</conditionLogic>",
-    "  - </rules>",
-    "  - </rightValue>",
-    "  - <rightValue>",
-    "  - <booleanValue>true</booleanValue>",
-    "  - </conditions>",
-    "  - <operator>EqualTo</operator>",
-    "  - </decisions>",
-    "  - <rules>",
-    "  - <conditions>",
-    "  - <locationY>",
-    "  - <values>",
-    "  - <default>false</default>",
-    "  - +",
-    "  - );",
-    "  - <enabled>false</enabled>",
-    "  - <viewAllRecords>false</viewAllRecords>",
-    "  - <userPermissions>",
-    "  - </userPermissions>",
-    "  - ",
-    "  - <enabled>true</enabled>",
-    "  - <enabled>false</enabled>",
-    "  - </formulas>",
-    "  - <dataType>Boolean</dataType>",
-    "  - <formulas>",
-    ");",
-    "<conditionLogic>and</conditionLogic>"
-]  # Líneas a excluir en la comprobación de conflictos y diferencias reportadas, suelen repetirse en los XML
-
-#Para los hotfixes, basta con ir a las PR merged e ir sacando las PR
+    "<default>false</default>", "<default>true</default>", "+++ b/", "--- a/", "force-app/main/default",
+    "<isActive>false</isActive>", "<isActive>true</isActive>", "<editable>", "- <editable>",
+    "  - <fieldPermissions>", "  - <readable>true</readable>", "  - </fieldPermissions>",
+    "  - <readable>true</readable>", "  - <editable>false</editable>", "<fieldPermissions>",
+    "</fieldPermissions>", "<readable>", "force-app", " force-app", ".xml", "diff --cc", "}", "{",
+    "else", "<locationY>", "- <locationY>", "<locationX>", "<conditionLogic>", "<valueSettings>",
+    "<picklistValues>", "<standardValue>", "</values>", "<values>", "</standardValue>",
+    "</picklistValues>", "<inputAssignments>", "</inputAssignments>", " <locationY>",
+    "<collectionProcessors>", " <collectionProcessors>", " <rightValue>", " </rightValue>",
+    "<editable>false</editable>", "<readable>true</readable>", " <default>false</default>",
+    " <values>", "<connector>", "</connector>", "<assignmentItems>", "</assignmentItems>", 
+    "<defaultConnectorLabel>", "<readable>", "<editable>", "<elementReference>", " <readable>"
+]
 
 def run_command(command, cwd=None, ignore_errors=False):
     result = subprocess.run(command, cwd=cwd, capture_output=True, text=True, shell=True)
@@ -165,7 +82,7 @@ def run_command(command, cwd=None, ignore_errors=False):
             for line in matching_lines:
                 print(f"  - {line}")
         else:
-            print("\033[32mNo se encontraron coincidencias entre los conflictos y original_diff.txt.\033[0m")
+            print("\033[32mNo se encontraron coincidencias entre los conflictos y original_diff.txt. No aceptes incoming, mantén current\033[0m")
 
             # Resolver conflictos utilizando "Accept Current"
             try:
@@ -187,7 +104,6 @@ def run_command(command, cwd=None, ignore_errors=False):
     except Exception as e:
         print(f"Error comparando conflictos con original_diff: {e}")
 
-def compare_conflicts_with_original_diff(conflicts_file, original_diff_file):
     try:
         if not os.path.exists(conflicts_file):
             print(f"Archivo de conflictos no encontrado: {conflicts_file}")
@@ -208,7 +124,14 @@ def compare_conflicts_with_original_diff(conflicts_file, original_diff_file):
 
         # Leer y limpiar conflictos
         with open(conflicts_file, "r", encoding="utf-8") as conflicts:
-            conflict_lines = {clean_line(line) for line in conflicts if clean_line(line)}
+            conflict_lines = {}
+            current_file = None
+            for line in conflicts:
+                line = clean_line(line)
+                if line.startswith("diff --git a/"):
+                    current_file = line.split()[-1]
+                elif line and current_file:
+                    conflict_lines.setdefault(current_file, set()).add(line)
 
         # Leer y limpiar original_diff
         with open(original_diff_file, "r", encoding="utf-8") as original_diff:
@@ -220,15 +143,143 @@ def compare_conflicts_with_original_diff(conflicts_file, original_diff_file):
             if not any(exclude in line for exclude in EXCLUDE_LINES)
         }
 
-        # Encontrar coincidencias
-        matching_lines = conflict_lines & filtered_original_lines
+        # Encontrar coincidencias y asociarlas con archivos
+        matching_files = {}
+        for file, lines in conflict_lines.items():
+            matching_lines = lines & filtered_original_lines
+            if matching_lines:
+                matching_files[file] = matching_lines
 
-        if matching_lines:
+        if matching_files:
             print("\033[33mCoincidencias encontradas en los conflictos:\033[0m")
-            for line in matching_lines:
-                print(f"  - {line}")   
+            for file, lines in matching_files.items():
+                print(f"\033[36mArchivo: {file}\033[0m")
+                for line in lines:
+                    print(f"  - {line}")
+        else:
+            print("\033[32mNo se encontraron coincidencias entre los conflictos y original_diff.txt.No aceptes incoming, mantén current\033[0m")
+
     except subprocess.CalledProcessError as e:
         print(f"\033[31mError al resolver conflictos automáticamente: {e}\033[0m")
+    except Exception as e:
+        print(f"Error comparando conflictos con original_diff: {e}")
+
+    try:
+        if not os.path.exists(conflicts_file):
+            print(f"Archivo de conflictos no encontrado: {conflicts_file}")
+            return
+        if not os.path.exists(original_diff_file):
+            print(f"Archivo original_diff no encontrado: {original_diff_file}")
+            return
+
+        def clean_line(line):
+            line = line.strip()
+            if line.startswith(('<<<<<<<', '=======', '>>>>>>>')):
+                return ""
+            if line.startswith(('+', '-')):
+                line = line[1:]
+            return ' '.join(line.split())
+
+        # Leer y limpiar los archivos de conflictos y original_diff
+        conflict_lines_by_file = {}
+        current_file = None
+        with open(conflicts_file, "r", encoding="utf-8") as conflicts:
+            for line in conflicts:
+                if line.startswith("diff --git a/"):
+                    current_file = line.split(" b/")[-1].strip()
+                    conflict_lines_by_file[current_file] = set()
+                elif current_file:
+                    cleaned_line = clean_line(line)
+                    if cleaned_line and not any(exclude in cleaned_line for exclude in EXCLUDE_LINES):
+                        conflict_lines_by_file[current_file].add(cleaned_line)
+
+        original_lines = set()
+        with open(original_diff_file, "r", encoding="utf-8") as original_diff:
+            for line in original_diff:
+                cleaned_line = clean_line(line)
+                if cleaned_line and not any(exclude in cleaned_line for exclude in EXCLUDE_LINES):
+                    original_lines.add(cleaned_line)
+
+        found_conflicts = False
+        for file, conflict_lines in conflict_lines_by_file.items():
+            matching_lines = conflict_lines & original_lines
+            if matching_lines:
+                found_conflicts = True
+                print(f"\033[33mCoincidencias encontradas, acepta las siguientes líneas incoming y el resto current en el archivo: {file}\033[0m")
+                for line in matching_lines:
+                    print(f"  - {line}")
+
+        if not found_conflicts:
+            print("\033[32mNo se encontraron coincidencias entre los conflictos y original_diff.txt.No aceptes incoming, mantén current\033[0m")
+
+    except Exception as e:
+        print(f"Error comparando conflictos con original_diff: {e}")
+
+
+def compare_conflicts_with_original_diff(conflicts_file, original_diff_file):
+    try:
+        if not os.path.exists(conflicts_file):
+            print(f"{Fore.RED}Archivo de conflictos no encontrado: {conflicts_file}{Style.RESET_ALL}")
+            return
+        if not os.path.exists(original_diff_file):
+            print(f"{Fore.RED}Archivo original_diff no encontrado: {original_diff_file}{Style.RESET_ALL}")
+            return
+
+        def clean_line(line):
+            """Limpia y normaliza una línea para comparación."""
+            line = line.strip()
+
+            # Ignorar marcas de conflicto y prefijos de git
+            if line.startswith(('<<<<<<<', '=======', '>>>>>>>', '@@', 'diff --cc', 'index', '--- a/', '+++ b/')):
+                return ""
+
+            # Remover indicadores de cambios en la comparación (`+`, `-`, `++`)
+            if line.startswith(('+', '-', '++')):
+                line = line[1:]
+
+            return ' '.join(line.split())  # Normaliza espacios
+
+        # Leer y limpiar los archivos de conflictos y original_diff
+        conflict_lines_by_file = {}
+        current_file = None
+        with open(conflicts_file, "r", encoding="utf-8") as conflicts:
+            for line in conflicts:
+                if line.startswith("diff --cc "):  # Detección correcta del inicio de un archivo
+                    current_file = line.split("diff --cc ")[-1].strip()
+                    conflict_lines_by_file[current_file] = set()
+                elif current_file:
+                    cleaned_line = clean_line(line)
+                    if cleaned_line:
+                        conflict_lines_by_file[current_file].add(cleaned_line)
+
+        # Filtrar archivos sin líneas en conflicto
+        conflict_lines_by_file = {file: lines for file, lines in conflict_lines_by_file.items() if lines}
+
+        # Depuración: Mostrar solo archivos que realmente tienen líneas en conflicto
+        if conflict_lines_by_file:
+            print("\n🔍 Archivos con conflictos detectados:")
+            for file, lines in conflict_lines_by_file.items():
+                print(f"  - {file} ({len(lines)} líneas)")
+
+        original_lines = set()
+        with open(original_diff_file, "r", encoding="utf-8") as original_diff:
+            for line in original_diff:
+                cleaned_line = clean_line(line)
+                if cleaned_line:
+                    original_lines.add(cleaned_line)
+
+        found_conflicts = False
+        for file, conflict_lines in conflict_lines_by_file.items():
+            matching_lines = conflict_lines & original_lines
+            if matching_lines:
+                found_conflicts = True
+                print(f"\n\033[33mCoincidencias encontradas, acepta incoming en lo siguiente y el resto current en el archivo: {file}\033[0m")
+                for line in matching_lines:
+                    print(f"  - {line}")
+
+        if not found_conflicts:
+            print("\n\033[32mNo se encontraron coincidencias entre los conflictos y original_diff.txt.\033[0m")
+
     except Exception as e:
         print(f"Error comparando conflictos con original_diff: {e}")
 
@@ -307,6 +358,10 @@ def resolver_conflictos_tests_to_run(archivo):
         return False
 
 def ejecutar_pre_push():
+    """
+    Detecta automáticamente el entorno de despliegue basado en la rama actual
+    y ejecuta los comandos correspondientes.
+    """
     try:
         # Obtener la rama actual
         result = subprocess.run(
@@ -328,29 +383,15 @@ def ejecutar_pre_push():
             print("\nDetectado entorno UAT2. Ejecutando comandos para QA...")
             comandos = [
                 "git fetch --all",
-                "sf sgd source delta --from origin/develop --output-dir deploy-manifest --ignore-file .deltaignore --ignore-whitespace",
-                "sf project deploy start --target-org QA-IBD --manifest deploy-manifest/package/package.xml -l NoTestRun --post-destructive-changes deploy-manifest/destructiveChanges/destructiveChanges.xml --ignore-warnings --dry-run"
+                "sf sgd source delta --from origin/develop --output-dir deploy-manifest --ignore-file .deltaignore --ignore-whitespace --source-dir force-app",
+                "sf project deploy start --target-org QA-IBD --manifest deploy-manifest/package/package.xml --post-destructive-changes deploy-manifest/destructiveChanges/destructiveChanges.xml --dry-run --wait 240 --ignore-warnings --concise --ignore-conflicts"
             ]
         elif "PROD" in current_branch:
             print("\nDetectado entorno PROD. Ejecutando comandos para PROD...")
             comandos = [
                 "git fetch --all",
-                "sf sgd source delta --from origin/master --output-dir deploy-manifest --ignore-file .deltaignore --ignore-whitespace",
-                "sf project deploy start --target-org IBD-prod --manifest deploy-manifest/package/package.xml -l NoTestRun --post-destructive-changes deploy-manifest/destructiveChanges/destructiveChanges.xml --ignore-warnings --dry-run"
-            ]
-        elif "mobility" in current_branch:
-            print("\nDetectado entorno mobility. Ejecutando comandos para mobility...")
-            comandos = [
-                "git fetch --all",
-                "sf sgd source delta --from origin/ci/mobility --output-dir deploy-manifest --ignore-file .deltaignore --ignore-whitespace",
-                "sf project deploy start --target-org mobility --manifest deploy-manifest/package/package.xml -l NoTestRun --post-destructive-changes deploy-manifest/destructiveChanges/destructiveChanges.xml --ignore-warnings --dry-run"
-            ]
-        elif "solar-develop" in current_branch:
-            print("\nDetectado entorno solar. Ejecutando comandos para solar...")
-            comandos = [
-                "git fetch --all",
-                "sf sgd source delta --from origin/ci/solar-develop --output-dir deploy-manifest --ignore-file .deltaignore --ignore-whitespace",
-                "sf project deploy start --target-org solar-develop --manifest deploy-manifest/package/package.xml -l NoTestRun --post-destructive-changes deploy-manifest/destructiveChanges/destructiveChanges.xml --ignore-warnings --dry-run"
+                "sf sgd source delta --from origin/master --output-dir deploy-manifest --ignore-file .deltaignore --ignore-whitespace --source-dir force-app",
+                "sf project deploy start --target-org IBD-prod --manifest deploy-manifest/package/package.xml --post-destructive-changes deploy-manifest/destructiveChanges/destructiveChanges.xml --dry-run --wait 240 --ignore-warnings --concise --ignore-conflicts"
             ]
         else:
             print("\nNo se detectó un entorno compatible en la rama actual. Por favor, verifica la rama.")
@@ -368,7 +409,6 @@ def ejecutar_pre_push():
 
     except Exception as e:
         print(f"Error en ejecutar_pre_push: {e}")
-
 
 def export_diff_to_file(repo, commit_base, commit_to, output_file, cached=False):
     try:
