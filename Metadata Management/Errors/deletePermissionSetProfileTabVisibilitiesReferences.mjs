@@ -23,7 +23,7 @@ async function eliminarFieldPermissionsPorPatron(rutaCarpeta, patronField) {
 
             // Crear la expresión regular para encontrar solo el bloque <fieldPermissions> específico que contiene el patrón en <field>
             const regex = new RegExp(
-                `<tabVisibilities>\\s*<tab>.*?${patronField}.*?</tab>\\s*<visibility>.*?</visibility>\\s*</tabVisibilities>`,
+                `<fieldPermissions>\\s*<editable>.*?</editable>\\s*<field>.*?${patronField}.*?</field>\\s*<readable>.*?</readable>\\s*</fieldPermissions>`,
                 'g'
             );
 
@@ -37,7 +37,7 @@ async function eliminarFieldPermissionsPorPatron(rutaCarpeta, patronField) {
 
                 // Guardar el archivo modificado
                 await fs.writeFile(rutaArchivo, archivoModificado, 'utf8');
-                console.log(`Se ha eliminado correctamente el bloque(s) de tab que contienen el patrón ${patronField} en ${archivo}.`);
+                console.log(`Se ha eliminado correctamente el bloque(s) de fieldPermissions que contienen el patrón ${patronField} en ${archivo}.`);
             } 
         }
 

@@ -26,7 +26,7 @@ async function eliminarUserPermissionsPorPatron(rutaCarpeta, patronPermission) {
 
             // Solo eliminar líneas vacías si hubo cambios
             if (archivoModificado !== data) {
-                archivoModificado = archivoModificado.replace(/^\s*[]/gm, '');
+                archivoModificado = archivoModificado.replace(/^\s*[\r\n]/gm, '');
 
                 // Guardar el archivo modificado
                 await fs.writeFile(rutaArchivo, archivoModificado, 'utf8');

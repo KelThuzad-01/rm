@@ -15,18 +15,16 @@ async function eliminarLayoutAssignmentsPorPatron(rutaCarpeta, patronLayout) {
             // Leer el archivo completo
             const data = await fs.readFile(rutaArchivo, 'utf8');
 
-            // Crear la expresión regular para encontrar y eliminar el bloque <layoutAssignments> específico
-            const regex = new RegExp(
-                `<layoutAssignments>\s*<layout>.*?${patronLayout}.*?</layout>\s*</layoutAssignments>`,
-                'g'
-            );
+            // Crear la expresión regular para encontrar y eliminar el bloque <layoutAssignments>
+            const regex = new RegExp(`<layoutAssignments>[\\s\\S]*?<layout>\\s*${patronLayout}\\s*</layout>[\\s\\S]*?</layoutAssignments>`, 'g');
+
 
             // Eliminar los bloques que coincidan con el patrón
             let archivoModificado = data.replace(regex, '');
 
             // Solo eliminar líneas vacías si hubo cambios
             if (archivoModificado !== data) {
-                archivoModificado = archivoModificado.replace(/^\s*[]/gm, '');
+                archivoModificado = archivoModificado.replace(/^\s*[\r\n]/gm, '');
 
                 // Guardar el archivo modificado
                 await fs.writeFile(rutaArchivo, archivoModificado, 'utf8');

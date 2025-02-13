@@ -41,7 +41,8 @@ delete_script_templates = {
     'apex_page': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deletePermissionSetProfileApexPagepermissionsReferencesByObjectOrField.mjs" "{profile_path}" "{apex_page_name}"',
     'flow_access': r'node "C:\\Users\\aberdun\Downloads\\rm\\Metadata Management\\Errors\deleteProfileFlowaccessesReferencesByFlow.mjs" "{profile_path}" "{flow_access_name}',
     'layout': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deletePermissionSetProfileLayoutAssignmentsReferences.mjs" "{profile_path}" "{layout_name}"',
-    'user_permission': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deletePermissionSetProfileUserPermissionsReferences.mjs" "{profile_path}" "{user_permission_name}"'
+    'user_permission': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deletePermissionSetProfileUserPermissionsReferences.mjs" "{profile_path}" "{user_permission_name}"',
+    'tab_visibility': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deletePermissionSetProfileTabVisibilitiesReferences.mjs" "{profile_path}" "{tab_name}"'
 }
 
 def run_command(command, cwd=None, ignore_errors=False):
@@ -379,19 +380,21 @@ def extract_errors(output):
         'class': re.findall(r'In field: apexClass - no ApexClass named\s+([^\s]+)\s+found', output),
         'apex_page': re.findall(r'In field: apexPage - no ApexPage named\s+([^\s]+)\s+found', output),
         'flow_access': re.findall(r'In field: flow - no FlowDefinition named\s+([^\s]+)\s+found', output),
-        'layout': re.findall(r'In field: layout - no Layout named\s+([^\s]+)\s+found', output),
-        'user_permission': re.findall(r'Unknown user permission:\s+([^\s]+)', output)
+        'layout': re.findall(r'In field: layout - no Layout named\s+([\w\d_-]+(?:\s+[\w\d_-]+)*)\s+found', output),
+        'user_permission': re.findall(r'Unknown user permission:\s+([^\s]+)', output),
+        'tab_visibility': re.findall(r'In field: tab - no CustomTab named\s+([^\s]+)\s+found', output)
     }
     return patterns
 
-def process_deployment():
+def process_deploymentQA():
+    deploy_command = "sf project deploy start --target-org QA-IBD --manifest deploy-manifest/package/package.xml --post-destructive-changes deploy-manifest/destructiveChanges/destructiveChanges.xml --dry-run --wait 240 --ignore-warnings --concise --ignore-conflicts"
     fields_found = True
     deployment_attempts = 0
 
     while fields_found:
         deployment_attempts += 1
         print(f'Starting deployment... (Attempt {deployment_attempts})')
-        output = execute_command(deploy_command)
+        output = run_command(deploy_command, cwd=REPO_PATH, ignore_errors=True)
         print('Deployment output:', output)
 
         errors = extract_errors(output)
@@ -404,9 +407,56 @@ def process_deployment():
                 for path in [profile_path, permission_set_path]:
                     delete_script = delete_script_templates[key].format(profile_path=path, **{f'{key}_name': item_name})
                     print(f'Running delete script for {key} at {path}...')
-                    delete_output = execute_command(delete_script)
+                    delete_output = run_command(delete_script, cwd=REPO_PATH, ignore_errors=True)
                     print('Delete script output:', delete_output)
                 
+                # Si el error es un objeto, invocar eliminación de sus FieldPermissions
+                if key == 'object':
+                    for path in [profile_path, permission_set_path]:
+                        delete_field_script = delete_script_templates['field'].format(profile_path=path, field_name=item_name)
+                        print(f'Running delete script for field permissions of object {item_name} at {path}...')
+                        delete_field_output = run_command(delete_field_script, cwd=REPO_PATH, ignore_errors=True)
+                        print('Delete field script output:', delete_field_output)
+                
+                action_taken = True
+        
+        if not action_taken:
+            print('No further action required.')
+            print('\a')  # Beep sound
+            fields_found = False
+        
+def process_deploymentPROD():
+    deploy_command = "sf project deploy start --target-org IBD-prod --manifest deploy-manifest/package/package.xml --post-destructive-changes deploy-manifest/destructiveChanges/destructiveChanges.xml --dry-run --wait 240 --ignore-warnings --concise --ignore-conflicts"
+    fields_found = True
+    deployment_attempts = 0
+
+    while fields_found:
+        deployment_attempts += 1
+        print(f'Starting deployment... (Attempt {deployment_attempts})')
+        output = run_command(deploy_command, cwd=REPO_PATH, ignore_errors=True)
+        print('Deployment output:', output)
+
+        errors = extract_errors(output)
+        action_taken = False
+
+        for key, items in errors.items():
+            for item_name in items:
+                print(f'Extracted {key}:', item_name)
+                
+                for path in [profile_path, permission_set_path]:
+                    delete_script = delete_script_templates[key].format(profile_path=path, **{f'{key}_name': item_name})
+                    print(f'Running delete script for {key} at {path}...')
+                    delete_output = run_command(delete_script, cwd=REPO_PATH, ignore_errors=True)
+                    print('Delete script output:', delete_output)
+                
+                # Si el error es un objeto, invocar eliminación de sus FieldPermissions
+                if key == 'object':
+                    for path in [profile_path, permission_set_path]:
+                        delete_field_script = delete_script_templates['field'].format(profile_path=path, field_name=item_name)
+                        print(f'Running delete script for field permissions of object {item_name} at {path}...')
+                        delete_field_output = run_command(delete_field_script, cwd=REPO_PATH, ignore_errors=True)
+                        print('Delete field script output:', delete_field_output)
+
                 action_taken = True
         
         if not action_taken:
@@ -450,15 +500,15 @@ def ejecutar_pre_push():
                     return
 
             print("\nComandos ejecutados correctamente.")
-            deploy_command = "sf project deploy start --target-org QA-IBD --manifest deploy-manifest/package/package.xml --post-destructive-changes deploy-manifest/destructiveChanges/destructiveChanges.xml --dry-run --wait 240 --ignore-warnings --concise --ignore-conflicts"
-            process_deployment()
+            
+            process_deploymentQA()
 
         elif "PROD" in current_branch:
             print("\nDetectado entorno PROD. Ejecutando comandos para PROD...")
             comandos = [
-                "git fetch --all",
-                "sf sgd source delta --from origin/master --output-dir deploy-manifest --ignore-file .deltaignore --ignore-whitespace --source-dir force-app",
-            ]
+                "git fetch --all"]
+            #    "sf sgd source delta --from origin/master --output-dir deploy-manifest --ignore-file .deltaignore --ignore-whitespace --source-dir force-app",
+            #]
             for comando in comandos:
                 print(f"Ejecutando: {comando}")
                 result = subprocess.run(comando, shell=True, text=True)
@@ -467,9 +517,8 @@ def ejecutar_pre_push():
                     return
 
             print("\nComandos ejecutados correctamente.")
-            deploy_command = "sf project deploy start --target-org IBD-prod --manifest deploy-manifest/package/package.xml --post-destructive-changes deploy-manifest/destructiveChanges/destructiveChanges.xml --dry-run --wait 240 --ignore-warnings --concise --ignore-conflicts"
-            process_deployment()
-            
+            process_deploymentPROD()
+
         else:
             print("\nNo se detectó un entorno compatible en la rama actual. Por favor, verifica la rama.")
             return
