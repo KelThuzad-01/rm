@@ -11,7 +11,6 @@ init(autoreset=True)
 # Configuración principal
 
 PULL_REQUESTS = [
-
 ]  # Lista de IDs de las Pull Requests.
 
 REPO_PATH = "C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx"
@@ -30,7 +29,8 @@ EXCLUDE_LINES = [
     "<collectionProcessors>", " <collectionProcessors>", " <rightValue>", " </rightValue>",
     "<editable>false</editable>", "<readable>true</readable>", " <default>false</default>",
     " <values>", "<connector>", "</connector>", "<assignmentItems>", "</assignmentItems>", 
-    "<defaultConnectorLabel>", "<readable>", "<editable>", "<elementReference>", " <readable>"
+    "<defaultConnectorLabel>", "<readable>", "<editable>", "<elementReference>", " <readable>",
+    "<conditionLogic>"
 ]
 
 delete_script_templates = {
@@ -38,7 +38,10 @@ delete_script_templates = {
     'record_type': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deletePermissionSetProfileRecordTypepermissionsReferences.mjs" "{profile_path}" "{record_type_name}"',
     'object': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deletePermissionSetProfileObjectpermissionsReferences.mjs" "{profile_path}" "{object_name}"',
     'class': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deletePermissionSetProfileClasspermissionsReferencesByObjectOrField.mjs" "{profile_path}" "{class_name}"',
-    'apex_page': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deletePermissionSetProfileApexPagepermissionsReferencesByObjectOrField.mjs" "{profile_path}" "{apex_page_name}"'
+    'apex_page': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deletePermissionSetProfileApexPagepermissionsReferencesByObjectOrField.mjs" "{profile_path}" "{apex_page_name}"',
+    'flow_access': r'node "C:\\Users\\aberdun\Downloads\\rm\\Metadata Management\\Errors\deleteProfileFlowaccessesReferencesByFlow.mjs" "{profile_path}" "{flow_access_name}',
+    'layout': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deletePermissionSetProfileLayoutAssignmentsReferences.mjs" "{profile_path}" "{layout_name}"',
+    'user_permission': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deletePermissionSetProfileUserPermissionsReferences.mjs" "{profile_path}" "{user_permission_name}"'
 }
 
 def run_command(command, cwd=None, ignore_errors=False):
@@ -396,6 +399,14 @@ def ejecutar_pre_push():
                 "git fetch --all",
                 "sf sgd source delta --from origin/develop --output-dir deploy-manifest --ignore-file .deltaignore --ignore-whitespace --source-dir force-app"
             ]
+            for comando in comandos:
+                print(f"Ejecutando: {comando}")
+                result = subprocess.run(comando, shell=True, text=True)
+                if result.returncode != 0:
+                    print(f"Error ejecutando el comando: {comando}")
+                    return
+
+            print("\nComandos ejecutados correctamente.")
             deploy_command = "sf project deploy start --target-org QA-IBD --manifest deploy-manifest/package/package.xml --post-destructive-changes deploy-manifest/destructiveChanges/destructiveChanges.xml --dry-run --wait 240 --ignore-warnings --concise --ignore-conflicts"
             fields_found = True
             deployment_attempts = 0
@@ -411,7 +422,10 @@ def ejecutar_pre_push():
                     'record_type': re.search(r'In field: recordType - no RecordType named\s+([^\s]+)\s+found', output),
                     'object': re.search(r'In field: field - no CustomObject named\s+([^\s]+)\s+found', output),
                     'class': re.search(r'In field: apexClass - no ApexClass named\s+([^\s]+)\s+found', output),
-                    'apex_page': re.search(r'In field: apexPage - no ApexPage named\s+([^\s]+)\s+found', output)
+                    'apex_page': re.search(r'In field: apexPage - no ApexPage named\s+([^\s]+)\s+found', output),
+                    'flow_access': re.search(r'In field: flow - no FlowDefinition named\s+([^\s]+)\s+found', output),
+                    'layout': re.search(r'In field: layout - no Layout named\s+([^\s]+)\s+found', output),
+                    'user_permission': re.search(r'Unknown user permission:\s+([^\s]+)', output)
                 }
 
                 action_taken = False
@@ -440,6 +454,14 @@ def ejecutar_pre_push():
                 "git fetch --all",
                 "sf sgd source delta --from origin/master --output-dir deploy-manifest --ignore-file .deltaignore --ignore-whitespace --source-dir force-app",
             ]
+            for comando in comandos:
+                print(f"Ejecutando: {comando}")
+                result = subprocess.run(comando, shell=True, text=True)
+                if result.returncode != 0:
+                    print(f"Error ejecutando el comando: {comando}")
+                    return
+
+            print("\nComandos ejecutados correctamente.")
             deploy_command = "sf project deploy start --target-org IBD-prod --manifest deploy-manifest/package/package.xml --post-destructive-changes deploy-manifest/destructiveChanges/destructiveChanges.xml --dry-run --wait 240 --ignore-warnings --concise --ignore-conflicts"
             fields_found = True
             deployment_attempts = 0
@@ -455,7 +477,10 @@ def ejecutar_pre_push():
                     'record_type': re.search(r'In field: recordType - no RecordType named\s+([^\s]+)\s+found', output),
                     'object': re.search(r'In field: field - no CustomObject named\s+([^\s]+)\s+found', output),
                     'class': re.search(r'In field: apexClass - no ApexClass named\s+([^\s]+)\s+found', output),
-                    'apex_page': re.search(r'In field: apexPage - no ApexPage named\s+([^\s]+)\s+found', output)
+                    'apex_page': re.search(r'In field: apexPage - no ApexPage named\s+([^\s]+)\s+found', output),
+                    'flow_access': re.search(r'In field: flow - no FlowDefinition named\s+([^\s]+)\s+found', output),
+                    'layout': re.search(r'In field: layout - no Layout named\s+([^\s]+)\s+found', output),
+                    'user_permission': re.search(r'Unknown user permission:\s+([^\s]+)', output)
                 }
 
                 action_taken = False
@@ -481,16 +506,6 @@ def ejecutar_pre_push():
         else:
             print("\nNo se detectó un entorno compatible en la rama actual. Por favor, verifica la rama.")
             return
-
-        # Ejecutar comandos
-        for comando in comandos:
-            print(f"Ejecutando: {comando}")
-            result = subprocess.run(comando, shell=True, text=True)
-            if result.returncode != 0:
-                print(f"Error ejecutando el comando: {comando}")
-                return
-
-        print("\nComandos ejecutados correctamente.")
 
     except Exception as e:
         print(f"Error en ejecutar_pre_push: {e}")
