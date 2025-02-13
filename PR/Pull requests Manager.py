@@ -7,6 +7,7 @@ import time
 from colorama import Fore, Style, init
 init(autoreset=True)
 
+
 # Configuración principal
 
 PULL_REQUESTS = [
@@ -14,6 +15,8 @@ PULL_REQUESTS = [
 ]  # Lista de IDs de las Pull Requests.
 
 REPO_PATH = "C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx"
+profile_path = "C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx\\force-app\\main\\default\\profiles"
+permission_set_path = "C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx\\force-app\\main\\default\\permissionsets"
 
 EXCLUDE_LINES = [
     "<default>false</default>", "<default>true</default>", "+++ b/", "--- a/", "force-app/main/default",
@@ -29,6 +32,14 @@ EXCLUDE_LINES = [
     " <values>", "<connector>", "</connector>", "<assignmentItems>", "</assignmentItems>", 
     "<defaultConnectorLabel>", "<readable>", "<editable>", "<elementReference>", " <readable>"
 ]
+
+delete_script_templates = {
+    'field': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deletePermissionSetProfileFieldpermissionsReferencesByObjectOrField.mjs" "{profile_path}" "{field_name}"',
+    'record_type': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deletePermissionSetProfileRecordTypepermissionsReferences.mjs" "{profile_path}" "{record_type_name}"',
+    'object': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deletePermissionSetProfileObjectpermissionsReferences.mjs" "{profile_path}" "{object_name}"',
+    'class': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deletePermissionSetProfileClasspermissionsReferencesByObjectOrField.mjs" "{profile_path}" "{class_name}"',
+    'apex_page': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deletePermissionSetProfileApexPagepermissionsReferencesByObjectOrField.mjs" "{profile_path}" "{apex_page_name}"'
+}
 
 def run_command(command, cwd=None, ignore_errors=False):
     result = subprocess.run(command, cwd=cwd, capture_output=True, text=True, shell=True)
@@ -383,16 +394,90 @@ def ejecutar_pre_push():
             print("\nDetectado entorno UAT2. Ejecutando comandos para QA...")
             comandos = [
                 "git fetch --all",
-                "sf sgd source delta --from origin/develop --output-dir deploy-manifest --ignore-file .deltaignore --ignore-whitespace --source-dir force-app",
-                "sf project deploy start --target-org QA-IBD --manifest deploy-manifest/package/package.xml --post-destructive-changes deploy-manifest/destructiveChanges/destructiveChanges.xml --dry-run --wait 240 --ignore-warnings --concise --ignore-conflicts"
+                "sf sgd source delta --from origin/develop --output-dir deploy-manifest --ignore-file .deltaignore --ignore-whitespace --source-dir force-app"
             ]
+            deploy_command = "sf project deploy start --target-org QA-IBD --manifest deploy-manifest/package/package.xml --post-destructive-changes deploy-manifest/destructiveChanges/destructiveChanges.xml --dry-run --wait 240 --ignore-warnings --concise --ignore-conflicts"
+            fields_found = True
+            deployment_attempts = 0
+
+            while fields_found:
+                deployment_attempts += 1
+                print(f'Starting deployment... (Attempt {deployment_attempts})')
+                output = run_command(deploy_command, cwd=REPO_PATH, ignore_errors=True)
+                print('Deployment output:', output)
+
+                patterns = {
+                    'field': re.search(r'In field: field - no CustomField named\s+([^\s]+)\s+found', output),
+                    'record_type': re.search(r'In field: recordType - no RecordType named\s+([^\s]+)\s+found', output),
+                    'object': re.search(r'In field: field - no CustomObject named\s+([^\s]+)\s+found', output),
+                    'class': re.search(r'In field: apexClass - no ApexClass named\s+([^\s]+)\s+found', output),
+                    'apex_page': re.search(r'In field: apexPage - no ApexPage named\s+([^\s]+)\s+found', output)
+                }
+
+                action_taken = False
+                
+                for key, match in patterns.items():
+                    if match:
+                        item_name = match.group(1)
+                        print(f'Extracted {key}:', item_name)
+                        
+                        for path in [profile_path, permission_set_path]:
+                            delete_script = delete_script_templates[key].format(profile_path=path, **{f'{key}_name': item_name})
+                            print(f'Running delete script for {key} at {path}...')
+                            delete_output = run_command(delete_script, cwd=REPO_PATH, ignore_errors=True)
+                            print('Delete script output:', delete_output)
+                        
+                        action_taken = True
+                        break
+                
+                if not action_taken:
+                    print('No further action required.')
+                    print('\a')  # Beep sound
+                    fields_found = False
         elif "PROD" in current_branch:
             print("\nDetectado entorno PROD. Ejecutando comandos para PROD...")
             comandos = [
                 "git fetch --all",
                 "sf sgd source delta --from origin/master --output-dir deploy-manifest --ignore-file .deltaignore --ignore-whitespace --source-dir force-app",
-                "sf project deploy start --target-org IBD-prod --manifest deploy-manifest/package/package.xml --post-destructive-changes deploy-manifest/destructiveChanges/destructiveChanges.xml --dry-run --wait 240 --ignore-warnings --concise --ignore-conflicts"
             ]
+            deploy_command = "sf project deploy start --target-org IBD-prod --manifest deploy-manifest/package/package.xml --post-destructive-changes deploy-manifest/destructiveChanges/destructiveChanges.xml --dry-run --wait 240 --ignore-warnings --concise --ignore-conflicts"
+            fields_found = True
+            deployment_attempts = 0
+
+            while fields_found:
+                deployment_attempts += 1
+                print(f'Starting deployment... (Attempt {deployment_attempts})')
+                output = run_command(deploy_command, cwd=REPO_PATH, ignore_errors=True)
+                print('Deployment output:', output)
+
+                patterns = {
+                    'field': re.search(r'In field: field - no CustomField named\s+([^\s]+)\s+found', output),
+                    'record_type': re.search(r'In field: recordType - no RecordType named\s+([^\s]+)\s+found', output),
+                    'object': re.search(r'In field: field - no CustomObject named\s+([^\s]+)\s+found', output),
+                    'class': re.search(r'In field: apexClass - no ApexClass named\s+([^\s]+)\s+found', output),
+                    'apex_page': re.search(r'In field: apexPage - no ApexPage named\s+([^\s]+)\s+found', output)
+                }
+
+                action_taken = False
+                
+                for key, match in patterns.items():
+                    if match:
+                        item_name = match.group(1)
+                        print(f'Extracted {key}:', item_name)
+                        
+                        for path in [profile_path, permission_set_path]:
+                            delete_script = delete_script_templates[key].format(profile_path=path, **{f'{key}_name': item_name})
+                            print(f'Running delete script for {key} at {path}...')
+                            delete_output = run_command(delete_script, cwd=REPO_PATH, ignore_errors=True)
+                            print('Delete script output:', delete_output)
+                        
+                        action_taken = True
+                        break
+                
+                if not action_taken:
+                    print('No further action required.')
+                    print('\a')  # Beep sound
+                    fields_found = False
         else:
             print("\nNo se detectó un entorno compatible en la rama actual. Por favor, verifica la rama.")
             return
