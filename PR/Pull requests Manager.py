@@ -371,6 +371,49 @@ def resolver_conflictos_tests_to_run(archivo):
         print(f"Error resolviendo conflictos en {archivo}: {e}")
         return False
 
+def extract_errors(output):
+    patterns = {
+        'field': re.findall(r'In field: field - no CustomField named\s+([^\s]+)\s+found', output),
+        'record_type': re.findall(r'In field: recordType - no RecordType named\s+([^\s]+)\s+found', output),
+        'object': re.findall(r'In field: field - no CustomObject named\s+([^\s]+)\s+found', output),
+        'class': re.findall(r'In field: apexClass - no ApexClass named\s+([^\s]+)\s+found', output),
+        'apex_page': re.findall(r'In field: apexPage - no ApexPage named\s+([^\s]+)\s+found', output),
+        'flow_access': re.findall(r'In field: flow - no FlowDefinition named\s+([^\s]+)\s+found', output),
+        'layout': re.findall(r'In field: layout - no Layout named\s+([^\s]+)\s+found', output),
+        'user_permission': re.findall(r'Unknown user permission:\s+([^\s]+)', output)
+    }
+    return patterns
+
+def process_deployment():
+    fields_found = True
+    deployment_attempts = 0
+
+    while fields_found:
+        deployment_attempts += 1
+        print(f'Starting deployment... (Attempt {deployment_attempts})')
+        output = execute_command(deploy_command)
+        print('Deployment output:', output)
+
+        errors = extract_errors(output)
+        action_taken = False
+
+        for key, items in errors.items():
+            for item_name in items:
+                print(f'Extracted {key}:', item_name)
+                
+                for path in [profile_path, permission_set_path]:
+                    delete_script = delete_script_templates[key].format(profile_path=path, **{f'{key}_name': item_name})
+                    print(f'Running delete script for {key} at {path}...')
+                    delete_output = execute_command(delete_script)
+                    print('Delete script output:', delete_output)
+                
+                action_taken = True
+        
+        if not action_taken:
+            print('No further action required.')
+            print('\a')  # Beep sound
+            fields_found = False
+
 def ejecutar_pre_push():
     """
     Detecta automáticamente el entorno de despliegue basado en la rama actual
@@ -408,46 +451,8 @@ def ejecutar_pre_push():
 
             print("\nComandos ejecutados correctamente.")
             deploy_command = "sf project deploy start --target-org QA-IBD --manifest deploy-manifest/package/package.xml --post-destructive-changes deploy-manifest/destructiveChanges/destructiveChanges.xml --dry-run --wait 240 --ignore-warnings --concise --ignore-conflicts"
-            fields_found = True
-            deployment_attempts = 0
+            process_deployment()
 
-            while fields_found:
-                deployment_attempts += 1
-                print(f'Starting deployment... (Attempt {deployment_attempts})')
-                output = run_command(deploy_command, cwd=REPO_PATH, ignore_errors=True)
-                print('Deployment output:', output)
-
-                patterns = {
-                    'field': re.search(r'In field: field - no CustomField named\s+([^\s]+)\s+found', output),
-                    'record_type': re.search(r'In field: recordType - no RecordType named\s+([^\s]+)\s+found', output),
-                    'object': re.search(r'In field: field - no CustomObject named\s+([^\s]+)\s+found', output),
-                    'class': re.search(r'In field: apexClass - no ApexClass named\s+([^\s]+)\s+found', output),
-                    'apex_page': re.search(r'In field: apexPage - no ApexPage named\s+([^\s]+)\s+found', output),
-                    'flow_access': re.search(r'In field: flow - no FlowDefinition named\s+([^\s]+)\s+found', output),
-                    'layout': re.search(r'In field: layout - no Layout named\s+([^\s]+)\s+found', output),
-                    'user_permission': re.search(r'Unknown user permission:\s+([^\s]+)', output)
-                }
-
-                action_taken = False
-                
-                for key, match in patterns.items():
-                    if match:
-                        item_name = match.group(1)
-                        print(f'Extracted {key}:', item_name)
-                        
-                        for path in [profile_path, permission_set_path]:
-                            delete_script = delete_script_templates[key].format(profile_path=path, **{f'{key}_name': item_name})
-                            print(f'Running delete script for {key} at {path}...')
-                            delete_output = run_command(delete_script, cwd=REPO_PATH, ignore_errors=True)
-                            print('Delete script output:', delete_output)
-                        
-                        action_taken = True
-                        break
-                
-                if not action_taken:
-                    print('No further action required.')
-                    print('\a')  # Beep sound
-                    fields_found = False
         elif "PROD" in current_branch:
             print("\nDetectado entorno PROD. Ejecutando comandos para PROD...")
             comandos = [
@@ -463,46 +468,8 @@ def ejecutar_pre_push():
 
             print("\nComandos ejecutados correctamente.")
             deploy_command = "sf project deploy start --target-org IBD-prod --manifest deploy-manifest/package/package.xml --post-destructive-changes deploy-manifest/destructiveChanges/destructiveChanges.xml --dry-run --wait 240 --ignore-warnings --concise --ignore-conflicts"
-            fields_found = True
-            deployment_attempts = 0
-
-            while fields_found:
-                deployment_attempts += 1
-                print(f'Starting deployment... (Attempt {deployment_attempts})')
-                output = run_command(deploy_command, cwd=REPO_PATH, ignore_errors=True)
-                print('Deployment output:', output)
-
-                patterns = {
-                    'field': re.search(r'In field: field - no CustomField named\s+([^\s]+)\s+found', output),
-                    'record_type': re.search(r'In field: recordType - no RecordType named\s+([^\s]+)\s+found', output),
-                    'object': re.search(r'In field: field - no CustomObject named\s+([^\s]+)\s+found', output),
-                    'class': re.search(r'In field: apexClass - no ApexClass named\s+([^\s]+)\s+found', output),
-                    'apex_page': re.search(r'In field: apexPage - no ApexPage named\s+([^\s]+)\s+found', output),
-                    'flow_access': re.search(r'In field: flow - no FlowDefinition named\s+([^\s]+)\s+found', output),
-                    'layout': re.search(r'In field: layout - no Layout named\s+([^\s]+)\s+found', output),
-                    'user_permission': re.search(r'Unknown user permission:\s+([^\s]+)', output)
-                }
-
-                action_taken = False
-                
-                for key, match in patterns.items():
-                    if match:
-                        item_name = match.group(1)
-                        print(f'Extracted {key}:', item_name)
-                        
-                        for path in [profile_path, permission_set_path]:
-                            delete_script = delete_script_templates[key].format(profile_path=path, **{f'{key}_name': item_name})
-                            print(f'Running delete script for {key} at {path}...')
-                            delete_output = run_command(delete_script, cwd=REPO_PATH, ignore_errors=True)
-                            print('Delete script output:', delete_output)
-                        
-                        action_taken = True
-                        break
-                
-                if not action_taken:
-                    print('No further action required.')
-                    print('\a')  # Beep sound
-                    fields_found = False
+            process_deployment()
+            
         else:
             print("\nNo se detectó un entorno compatible en la rama actual. Por favor, verifica la rama.")
             return
