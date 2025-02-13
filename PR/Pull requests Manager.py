@@ -46,7 +46,7 @@ delete_script_templates = {
 }
 
 def run_command(command, cwd=None, ignore_errors=False):
-    result = subprocess.run(command, cwd=cwd, capture_output=True, text=True, shell=True)
+    result = subprocess.run(command, cwd=cwd, capture_output=True, text=True, shell=True, encoding="utf-8")
     if result.returncode != 0:
         if ignore_errors:
             print(f"")
