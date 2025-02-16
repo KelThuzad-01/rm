@@ -44,7 +44,8 @@ delete_script_templates = {
     'layout': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deletePermissionSetProfileLayoutAssignmentsReferences.mjs" "{profile_path}" "{layout_name}"',
     'user_permission': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deletePermissionSetProfileUserPermissionsReferences.mjs" "{profile_path}" "{user_permission_name}"',
     'tab_visibility': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deletePermissionSetProfileTabVisibilitiesReferences.mjs" "{profile_path}" "{tab_name}"',
-    'custom_metadata_access': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deleteCustomMetadataAccesses.mjs" "{profile_path}" "{metadata_name}"'
+    'custom_metadata_access': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deleteCustomMetadataAccesses.mjs" "{profile_path}" "{metadata_name}"',
+    'custom_permission': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deleteCustomPermissions.mjs" "{profile_path}" "{custom_permission_name}"'
 }
 
 def run_command(command, cwd=None, ignore_errors=False):
@@ -396,7 +397,8 @@ def extract_errors(output):
     'layout': r'In field:\s+layout\s+-\s+no Layout named\s+([\w\d_.-]+(?:\s+[\w\d_.-]+)*)\s+found',
     'user_permission': r'Unknown user permission:\s+([\w\d_.-]+)',
     'tab_visibility': r'In field:\s+tab\s+-\s+no CustomTab named\s+([\w\d_.-]+)\s+found',
-    'custom_metadata_access': r'In field:\s+customMetadataType\s+-\s+no CustomObject named\s+([\w\d_.-]+)\s+found'
+    'custom_metadata_access': r'In field:\s+customMetadataType\s+-\s+no CustomObject named\s+([\w\d_.-]+)\s+found',
+    'custom_permission': r'In field: customPermission - no CustomPermission named\s+([\w\d_.-]+)\s+found',
 }
 
 
@@ -441,7 +443,7 @@ def process_deploymentQA():
                 print(f'Extracted {key}:', item_name)
 
                 for path in [profile_path, permission_set_path]:
-                    replacement_key = 'metadata_name' if key == 'custom_metadata_access' else f'{key}_name'
+                    replacement_key = 'custom_permission_name' if key == 'custom_permission' else f'{key}_name'
                     delete_script = delete_script_templates[key].format(profile_path=path, **{replacement_key: item_name})
                     print(f'Running delete script for {key} at {path}...')
                     delete_output = run_command(delete_script)
