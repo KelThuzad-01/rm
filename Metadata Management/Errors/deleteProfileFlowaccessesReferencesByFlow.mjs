@@ -29,7 +29,7 @@ async function eliminarFlowAccessesPorPatron(rutaCarpeta, patronFlow) {
 
                 // Guardar el archivo modificado
                 await fs.writeFile(rutaArchivo, archivoModificado, 'utf8');
-                console.log(`Se ha eliminado correctamente el bloque(s) de flowAccesses que contienen el patrón ${patronFlow} en ${archivo}.`);
+                console.log(`${patronFlow} OK`);
             }
         }
 

@@ -1,8 +1,12 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 
+// Elimina los customMetadataTypeAccesses en PermissionSet/Perfiles a partir de un objeto
 
-async function eliminarFieldPermissionsPorPatron(rutaCarpeta, patronField) {
+// Ejemplo de ejecución manual:
+// node deleteCustomMetadataAccesses.mjs "C:\Users\aberdun\Downloads\iberdrola-sfdx\force-app\main\default\profiles" "IBD_IBERGO_Control_de_Estados__mdt"
+
+async function eliminarCustomMetadataAccesses(rutaCarpeta, patronMetadata) {
     try {
         // Leer todos los archivos en la carpeta
         const archivos = await fs.readdir(rutaCarpeta);
@@ -14,13 +18,13 @@ async function eliminarFieldPermissionsPorPatron(rutaCarpeta, patronField) {
             // Leer el archivo completo
             const data = await fs.readFile(rutaArchivo, 'utf8');
 
-            // Crear la expresión regular para encontrar solo el bloque <fieldPermissions> específico que contiene el patrón en <field>
+            // Crear la expresión regular para encontrar y eliminar el bloque <customMetadataTypeAccesses>
             const regex = new RegExp(
-                `<objectPermissions>\\s*<allowCreate>.*?</allowCreate>\\s*<allowDelete>.*?</allowDelete>\\s*<allowEdit>.*?</allowEdit>\\s*<allowRead>.*?</allowRead>\\s*<modifyAllRecords>.*?</modifyAllRecords>\\s*<object>.*?${patronField}.*?</object>\\s*<viewAllRecords>.*?</viewAllRecords>\\s*</objectPermissions>`,
-                'g'
+                `<customMetadataTypeAccesses>\\s*<enabled>.*?</enabled>\\s*<name>${patronMetadata.replace(/[-/\\]/g, '\\\\$&')}</name>\\s*</customMetadataTypeAccesses>`,
+                'gs'
             );
 
-            // Eliminar solo los bloques <fieldPermissions> que coincidan con el patrón en <field>
+            // Eliminar los bloques que coincidan con el patrón en <name>
             let archivoModificado = data.replace(regex, '');
 
             // Solo eliminar líneas vacías si hubo cambios
@@ -30,16 +34,15 @@ async function eliminarFieldPermissionsPorPatron(rutaCarpeta, patronField) {
 
                 // Guardar el archivo modificado
                 await fs.writeFile(rutaArchivo, archivoModificado, 'utf8');
-                console.log(`${patronField} OK`);
-            } 
+                console.log(`${patronMetadata} OK`);
+            }
         }
-
     } catch (err) {
         console.error('Error:', err);
     }
 }
 
-// Parámetros: ruta de la carpeta y patrón de field
-const [,, rutaCarpeta, patronField] = process.argv;
+// Parámetros: ruta de la carpeta y patrón de metadata
+const [,, rutaCarpeta, patronMetadata] = process.argv;
 
-eliminarFieldPermissionsPorPatron(rutaCarpeta, patronField);
+eliminarCustomMetadataAccesses(rutaCarpeta, patronMetadata);

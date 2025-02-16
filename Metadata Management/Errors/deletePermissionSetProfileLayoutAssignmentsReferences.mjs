@@ -28,7 +28,7 @@ async function eliminarLayoutAssignmentsPorPatron(rutaCarpeta, patronLayout) {
 
                 // Guardar el archivo modificado
                 await fs.writeFile(rutaArchivo, archivoModificado, 'utf8');
-                console.log(`Se ha eliminado correctamente el bloque(s) de layoutAssignments que contienen el patrón ${patronLayout} en ${archivo}.`);
+                console.log(`${patronLayout} OK`);
             }
         }
     } catch (err) {

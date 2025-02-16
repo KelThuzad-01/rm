@@ -4,11 +4,12 @@ import webbrowser
 import re
 from git import Repo
 import time
+import unicodedata
 from colorama import Fore, Style, init
 init(autoreset=True)
 
 
-# Configuración principal
+setDelta = False
 
 PULL_REQUESTS = [
 ]  # Lista de IDs de las Pull Requests.
@@ -42,17 +43,20 @@ delete_script_templates = {
     'flow_access': r'node "C:\\Users\\aberdun\Downloads\\rm\\Metadata Management\\Errors\deleteProfileFlowaccessesReferencesByFlow.mjs" "{profile_path}" "{flow_access_name}',
     'layout': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deletePermissionSetProfileLayoutAssignmentsReferences.mjs" "{profile_path}" "{layout_name}"',
     'user_permission': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deletePermissionSetProfileUserPermissionsReferences.mjs" "{profile_path}" "{user_permission_name}"',
-    'tab_visibility': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deletePermissionSetProfileTabVisibilitiesReferences.mjs" "{profile_path}" "{tab_name}"'
+    'tab_visibility': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deletePermissionSetProfileTabVisibilitiesReferences.mjs" "{profile_path}" "{tab_name}"',
+    'custom_metadata_access': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deleteCustomMetadataAccesses.mjs" "{profile_path}" "{metadata_name}"'
 }
 
 def run_command(command, cwd=None, ignore_errors=False):
     result = subprocess.run(command, cwd=cwd, capture_output=True, text=True, shell=True, encoding="utf-8")
+    
     if result.returncode != 0:
         if ignore_errors:
-            print(f"")
+            return result.stdout.strip()  # Devuelve la salida, incluso con error
         else:
             print(f"Error ejecutando {command}:\n{result.stderr}")
-            raise Exception(result.stderr)
+            return result.stdout.strip()  # ⬅️ Cambiado para devolver la salida en lugar de lanzar excepción
+    
     return result.stdout.strip()
 
 
@@ -372,19 +376,43 @@ def resolver_conflictos_tests_to_run(archivo):
         print(f"Error resolviendo conflictos en {archivo}: {e}")
         return False
 
+def normalize_text(text):
+    return unicodedata.normalize("NFC", text)
+
 def extract_errors(output):
-    patterns = {
-        'field': re.findall(r'In field: field - no CustomField named\s+([^\s]+)\s+found', output),
-        'record_type': re.findall(r'In field: recordType - no RecordType named\s+([^\s]+)\s+found', output),
-        'object': re.findall(r'In field: field - no CustomObject named\s+([^\s]+)\s+found', output),
-        'class': re.findall(r'In field: apexClass - no ApexClass named\s+([^\s]+)\s+found', output),
-        'apex_page': re.findall(r'In field: apexPage - no ApexPage named\s+([^\s]+)\s+found', output),
-        'flow_access': re.findall(r'In field: flow - no FlowDefinition named\s+([^\s]+)\s+found', output),
-        'layout': re.findall(r'In field: layout - no Layout named\s+([\w\d_-]+(?:\s+[\w\d_-]+)*)\s+found', output),
-        'user_permission': re.findall(r'Unknown user permission:\s+([^\s]+)', output),
-        'tab_visibility': re.findall(r'In field: tab - no CustomTab named\s+([^\s]+)\s+found', output)
-    }
-    return patterns
+    if not output:
+        print("⚠ Advertencia: No se recibió salida del despliegue.")
+        return {}
+
+    
+    # Diccionario con patrones mejorados para capturar errores
+    error_patterns = {
+    'field': r'In field:\s+field\s+-\s+no CustomField named\s+([\w\d_.-]+)\s+found',
+    'record_type': r'In field:\s+recordType\s+-\s+no RecordType named\s+([\w\d_.-]+)\s+found',
+    'object': r'In field:\s+field\s+-\s+no CustomObject named\s+([\w\d_.-]+)\s+found',
+    'class': r'In field:\s+apexClass\s+-\s+no ApexClass named\s+([\w\d_.-]+)\s+found',
+    'apex_page': r'In field:\s+apexPage\s+-\s+no ApexPage named\s+([\w\d_.-]+)\s+found',
+    'flow_access': r'In field:\s+flow\s+-\s+no FlowDefinition named\s+([\w\d_.-]+)\s+found',
+    'layout': r'In field:\s+layout\s+-\s+no Layout named\s+([\w\d_.-]+(?:\s+[\w\d_.-]+)*)\s+found',
+    'user_permission': r'Unknown user permission:\s+([\w\d_.-]+)',
+    'tab_visibility': r'In field:\s+tab\s+-\s+no CustomTab named\s+([\w\d_.-]+)\s+found',
+    'custom_metadata_access': r'In field:\s+customMetadataType\s+-\s+no CustomObject named\s+([\w\d_.-]+)\s+found'
+}
+
+
+    # Buscar coincidencias en la salida
+    errors = {}
+    for key, pattern in error_patterns.items():
+        matches = re.findall(pattern, output)
+        if matches:
+            errors[key] = set(matches)
+
+    if not errors:
+        print("⚠ No se detectaron errores, esto puede indicar un problema con el regex o la salida del despliegue.")
+
+    print("Extracted Errors:", errors)  # Debugging output
+    return errors
+
 
 def process_deploymentQA():
     deploy_command = "sf project deploy start --target-org QA-IBD --manifest deploy-manifest/package/package.xml --post-destructive-changes deploy-manifest/destructiveChanges/destructiveChanges.xml --dry-run --wait 240 --ignore-warnings --concise --ignore-conflicts"
@@ -394,36 +422,39 @@ def process_deploymentQA():
     while fields_found:
         deployment_attempts += 1
         print(f'Starting deployment... (Attempt {deployment_attempts})')
-        output = run_command(deploy_command, cwd=REPO_PATH, ignore_errors=True)
-        print('Deployment output:', output)
+
+        output = run_command(deploy_command)
+        
+        # Verificar si la salida está vacía
+        if not output.strip():
+            print("⚠ Advertencia: La salida del despliegue está vacía. Puede haber un problema con la ejecución del comando.")
+            return
 
         errors = extract_errors(output)
         action_taken = False
 
         for key, items in errors.items():
+            if not items:
+                continue
             for item_name in items:
+                item_name = normalize_text(item_name)
                 print(f'Extracted {key}:', item_name)
-                
+
                 for path in [profile_path, permission_set_path]:
-                    delete_script = delete_script_templates[key].format(profile_path=path, **{f'{key}_name': item_name})
+                    replacement_key = 'metadata_name' if key == 'custom_metadata_access' else f'{key}_name'
+                    delete_script = delete_script_templates[key].format(profile_path=path, **{replacement_key: item_name})
                     print(f'Running delete script for {key} at {path}...')
-                    delete_output = run_command(delete_script, cwd=REPO_PATH, ignore_errors=True)
+                    delete_output = run_command(delete_script)
                     print('Delete script output:', delete_output)
-                
-                # Si el error es un objeto, invocar eliminación de sus FieldPermissions
-                if key == 'object':
-                    for path in [profile_path, permission_set_path]:
-                        delete_field_script = delete_script_templates['field'].format(profile_path=path, field_name=item_name)
-                        print(f'Running delete script for field permissions of object {item_name} at {path}...')
-                        delete_field_output = run_command(delete_field_script, cwd=REPO_PATH, ignore_errors=True)
-                        print('Delete field script output:', delete_field_output)
-                
+
                 action_taken = True
-        
+
         if not action_taken:
             print('No further action required.')
             print('\a')  # Beep sound
             fields_found = False
+
+
         
 def process_deploymentPROD():
     deploy_command = "sf project deploy start --target-org IBD-prod --manifest deploy-manifest/package/package.xml --post-destructive-changes deploy-manifest/destructiveChanges/destructiveChanges.xml --dry-run --wait 240 --ignore-warnings --concise --ignore-conflicts"
@@ -433,36 +464,40 @@ def process_deploymentPROD():
     while fields_found:
         deployment_attempts += 1
         print(f'Starting deployment... (Attempt {deployment_attempts})')
-        output = run_command(deploy_command, cwd=REPO_PATH, ignore_errors=True)
-        print('Deployment output:', output)
+
+        output = run_command(deploy_command)
+        
+        # Verificar si la salida está vacía
+        if not output.strip():
+            print("⚠ Advertencia: La salida del despliegue está vacía. Puede haber un problema con la ejecución del comando.")
+            return
+
 
         errors = extract_errors(output)
         action_taken = False
 
         for key, items in errors.items():
+            if not items:
+                continue
             for item_name in items:
+                item_name = normalize_text(item_name)
                 print(f'Extracted {key}:', item_name)
-                
+
                 for path in [profile_path, permission_set_path]:
-                    delete_script = delete_script_templates[key].format(profile_path=path, **{f'{key}_name': item_name})
+                    replacement_key = 'metadata_name' if key == 'custom_metadata_access' else f'{key}_name'
+                    delete_script = delete_script_templates[key].format(profile_path=path, **{replacement_key: item_name})
                     print(f'Running delete script for {key} at {path}...')
-                    delete_output = run_command(delete_script, cwd=REPO_PATH, ignore_errors=True)
+                    delete_output = run_command(delete_script)
                     print('Delete script output:', delete_output)
-                
-                # Si el error es un objeto, invocar eliminación de sus FieldPermissions
-                if key == 'object':
-                    for path in [profile_path, permission_set_path]:
-                        delete_field_script = delete_script_templates['field'].format(profile_path=path, field_name=item_name)
-                        print(f'Running delete script for field permissions of object {item_name} at {path}...')
-                        delete_field_output = run_command(delete_field_script, cwd=REPO_PATH, ignore_errors=True)
-                        print('Delete field script output:', delete_field_output)
 
                 action_taken = True
-        
+
         if not action_taken:
             print('No further action required.')
             print('\a')  # Beep sound
             fields_found = False
+
+
 
 def ejecutar_pre_push():
     """
@@ -488,10 +523,17 @@ def ejecutar_pre_push():
         # Detectar entorno basado en la rama
         if "UAT2" in current_branch:
             print("\nDetectado entorno UAT2. Ejecutando comandos para QA...")
-            comandos = [
+            if setDelta:
+                print("\nGenerando delta...")
+                comandos = [
                 "git fetch --all",
-                "sf sgd source delta --from origin/develop --output-dir deploy-manifest --ignore-file .deltaignore --ignore-whitespace --source-dir force-app"
+                "sf sgd source delta --from $(git log --merges -n 1 --format='%H' origin/develop) --output-dir deploy-manifest --ignore-file .deltaignore --ignore-whitespace --source-dir force-app"
             ]
+            else:
+                comandos = [
+                    "git fetch --all"
+                ]
+
             for comando in comandos:
                 print(f"Ejecutando: {comando}")
                 result = subprocess.run(comando, shell=True, text=True)
@@ -505,10 +547,16 @@ def ejecutar_pre_push():
 
         elif "PROD" in current_branch:
             print("\nDetectado entorno PROD. Ejecutando comandos para PROD...")
-            comandos = [
-                "git fetch --all"]
-            #    "sf sgd source delta --from origin/master --output-dir deploy-manifest --ignore-file .deltaignore --ignore-whitespace --source-dir force-app",
-            #]
+            if setDelta:
+                print("\nGenerando delta...")
+                comandos = [
+                "git fetch --all",
+                "sf sgd source delta --from $(git log --merges -n 1 --format='%H' origin/develop) --output-dir deploy-manifest --ignore-file .deltaignore --ignore-whitespace --source-dir force-app"
+            ]
+            else:
+                comandos = [
+                    "git fetch --all"
+                ]
             for comando in comandos:
                 print(f"Ejecutando: {comando}")
                 result = subprocess.run(comando, shell=True, text=True)

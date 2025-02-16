@@ -30,7 +30,7 @@ async function eliminarUserPermissionsPorPatron(rutaCarpeta, patronPermission) {
 
                 // Guardar el archivo modificado
                 await fs.writeFile(rutaArchivo, archivoModificado, 'utf8');
-                console.log(`Se ha eliminado correctamente el bloque(s) de userPermissions que contienen el patrón ${patronPermission} en ${archivo}.`);
+                console.log(`${patronPermission} OK`);
             }
         }
     } catch (err) {

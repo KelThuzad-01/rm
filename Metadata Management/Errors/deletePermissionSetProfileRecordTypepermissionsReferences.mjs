@@ -30,7 +30,7 @@ async function eliminarFieldPermissionsPorPatron(rutaCarpeta, patronField) {
 
                 // Guardar el archivo modificado
                 await fs.writeFile(rutaArchivo, archivoModificado, 'utf8');
-                console.log(`Se ha eliminado correctamente el bloque(s) de recordTypeVisibilities que contienen el patrón ${patronField} en ${archivo}.`);
+                console.log(`${patronField} OK`);
             } 
         }
 
