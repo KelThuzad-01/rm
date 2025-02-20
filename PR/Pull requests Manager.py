@@ -11,7 +11,7 @@ init(autoreset=True)
 
 setDelta = False
 
-PULL_REQUESTS = [9571
+PULL_REQUESTS = [ 
 ]  # Lista de IDs de las Pull Requests.
 
 REPO_PATH = "C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx"
@@ -45,7 +45,9 @@ delete_script_templates = {
     'tab_visibility': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deletePermissionSetProfileTabVisibilitiesReferences.mjs" "{profile_path}" "{tab_name}"',
     'custom_metadata_access': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deleteCustomMetadataAccesses.mjs" "{profile_path}" "{metadata_name}"',
     'custom_permission': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deleteCustomPermissions.mjs" "{profile_path}" "{custom_permission_name}"',
-    'user_permission': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deleteUserPermissions.mjs" "{profile_path}" "{user_permission_name}"'
+    'user_permission': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deleteUserPermissions.mjs" "{profile_path}" "{user_permission_name}"',
+    'mdt_fields': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deleteMDTFieldPermissions.mjs" "{profile_path}" "{object_name}"',
+    'mdt_layouts': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deleteMDTLayoutAssignments.mjs" "{profile_path}" "{object_name}"'
 }
 
 def run_command(command, cwd=None, ignore_errors=False):
@@ -436,13 +438,17 @@ def process_deploymentQA():
                     if key == 'field_specific':
                         object_name, field_name = item
                         delete_script = delete_script_templates['field_specific'].format(profile_path=path, object_name=object_name, field_name=field_name)
-                    elif isinstance(item, tuple):
-                        delete_script = delete_script_templates[key].format(profile_path=path, **{f'{key}_name': item[0]})
+                    elif key == 'object' and item.endswith('__mdt'):
+                        delete_script = delete_script_templates['mdt_fields'].format(profile_path=path, object_name=item)
+                        run_command(delete_script)
+                        delete_script = delete_script_templates['mdt_layouts'].format(profile_path=path, object_name=item)
+                    elif key == 'custom_metadata_access':
+                        delete_script = delete_script_templates[key].format(profile_path=path, metadata_name=item)  # 💡 Aquí está la corrección
                     else:
                         delete_script = delete_script_templates[key].format(profile_path=path, **{f'{key}_name': item})
 
                     print(f'Running delete script for {key} at {path}...')
-                    delete_output = run_command(delete_script, cwd=REPO_PATH, ignore_errors=True)
+                    delete_output = run_command(delete_script)
                     print('Delete script output:', delete_output)
 
                 action_taken = True
@@ -482,13 +488,17 @@ def process_deploymentPROD():
                     if key == 'field_specific':
                         object_name, field_name = item
                         delete_script = delete_script_templates['field_specific'].format(profile_path=path, object_name=object_name, field_name=field_name)
-                    elif isinstance(item, tuple):
-                        delete_script = delete_script_templates[key].format(profile_path=path, **{f'{key}_name': item[0]})
+                    elif key == 'object' and item.endswith('__mdt'):
+                        delete_script = delete_script_templates['mdt_fields'].format(profile_path=path, object_name=item)
+                        run_command(delete_script)
+                        delete_script = delete_script_templates['mdt_layouts'].format(profile_path=path, object_name=item)
+                    elif key == 'custom_metadata_access':
+                        delete_script = delete_script_templates[key].format(profile_path=path, metadata_name=item)  # 💡 Aquí está la corrección
                     else:
                         delete_script = delete_script_templates[key].format(profile_path=path, **{f'{key}_name': item})
 
                     print(f'Running delete script for {key} at {path}...')
-                    delete_output = run_command(delete_script, cwd=REPO_PATH, ignore_errors=True)
+                    delete_output = run_command(delete_script)
                     print('Delete script output:', delete_output)
 
                 action_taken = True
@@ -527,13 +537,18 @@ def process_deploymentAnother():
                     if key == 'field_specific':
                         object_name, field_name = item
                         delete_script = delete_script_templates['field_specific'].format(profile_path=path, object_name=object_name, field_name=field_name)
-                    elif isinstance(item, tuple):
-                        delete_script = delete_script_templates[key].format(profile_path=path, **{f'{key}_name': item[0]})
+                    elif key == 'object' and item.endswith('__mdt'):
+                        delete_script = delete_script_templates['mdt_fields'].format(profile_path=path, object_name=item)
+                        run_command(delete_script)
+                        delete_script = delete_script_templates['mdt_layouts'].format(profile_path=path, object_name=item)
+                    elif key == 'custom_metadata_access':
+                        delete_script = delete_script_templates[key].format(profile_path=path, metadata_name=item)  # 💡 Aquí está la corrección
                     else:
                         delete_script = delete_script_templates[key].format(profile_path=path, **{f'{key}_name': item})
 
+
                     print(f'Running delete script for {key} at {path}...')
-                    delete_output = run_command(delete_script, cwd=REPO_PATH, ignore_errors=True)
+                    delete_output = run_command(delete_script)
                     print('Delete script output:', delete_output)
 
                 action_taken = True

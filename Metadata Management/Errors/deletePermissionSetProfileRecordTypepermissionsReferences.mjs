@@ -1,8 +1,7 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 
-
-async function eliminarFieldPermissionsPorPatron(rutaCarpeta, patronField) {
+async function eliminarRecordTypeVisibilitiesPorPatron(rutaCarpeta, patronRecordType) {
     try {
         // Leer todos los archivos en la carpeta
         const archivos = await fs.readdir(rutaCarpeta);
@@ -14,32 +13,36 @@ async function eliminarFieldPermissionsPorPatron(rutaCarpeta, patronField) {
             // Leer el archivo completo
             const data = await fs.readFile(rutaArchivo, 'utf8');
 
-            // Crear la expresión regular para encontrar solo el bloque <fieldPermissions> específico que contiene el patrón en <field>
-            const regex = new RegExp(
-                `<recordTypeVisibilities>\\s*<default>.*?</default>\\s*<recordType>.*?${patronField}.*?</recordType>\\s*<visible>.*?</visible>\\s*</recordTypeVisibilities>`,
+            // Expresión regular para eliminar el bloque <recordTypeVisibilities> en perfiles
+            const regexProfile = new RegExp(
+                `<recordTypeVisibilities>\\s*(?:<default>.*?</default>\\s*)?<recordType>\\s*${patronRecordType}\\s*</recordType>\\s*<visible>.*?</visible>\\s*</recordTypeVisibilities>`,
                 'g'
             );
 
-            // Eliminar solo los bloques <fieldPermissions> que coincidan con el patrón en <field>
-            let archivoModificado = data.replace(regex, '');
+            // Expresión regular para eliminar el bloque <recordTypeVisibilities> en permission sets
+            const regexPermissionSet = new RegExp(
+                `<recordTypeVisibilities>\\s*<recordType>\\s*${patronRecordType}\\s*</recordType>\\s*<visible>.*?</visible>\\s*</recordTypeVisibilities>`,
+                'g'
+            );
+
+            // Aplicar las eliminaciones
+            let archivoModificado = data.replace(regexProfile, '').replace(regexPermissionSet, '');
 
             // Solo eliminar líneas vacías si hubo cambios
             if (archivoModificado !== data) {
-                // Eliminar líneas vacías resultantes
-                archivoModificado = archivoModificado.replace(/^\s*[\r\n]/gm, '');
+                archivoModificado = archivoModificado.replace(/^\s*[\r\n]/gm, ''); // Eliminar líneas vacías
 
                 // Guardar el archivo modificado
                 await fs.writeFile(rutaArchivo, archivoModificado, 'utf8');
-                console.log(`${patronField} OK`);
-            } 
+                console.log(`${patronRecordType} eliminado correctamente`);
+            }
         }
-
     } catch (err) {
         console.error('Error:', err);
     }
 }
 
-// Parámetros: ruta de la carpeta y patrón de field
-const [,, rutaCarpeta, patronField] = process.argv;
+// Parámetros: ruta de la carpeta y patrón de RecordType
+const [,, rutaCarpeta, patronRecordType] = process.argv;
 
-eliminarFieldPermissionsPorPatron(rutaCarpeta, patronField);
+eliminarRecordTypeVisibilitiesPorPatron(rutaCarpeta, patronRecordType);
