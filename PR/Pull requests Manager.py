@@ -11,7 +11,7 @@ init(autoreset=True)
 
 setDelta = False
 
-PULL_REQUESTS = [
+PULL_REQUESTS = [9571
 ]  # Lista de IDs de las Pull Requests.
 
 REPO_PATH = "C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx"
@@ -35,17 +35,17 @@ EXCLUDE_LINES = [
 ]
 
 delete_script_templates = {
-    'field': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deletePermissionSetProfileFieldpermissionsReferencesByObjectOrField.mjs" "{profile_path}" "{field_name}"',
+    'field_specific': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deleteFieldSpecificPermissions.mjs" "{profile_path}" "{object_name}" "{field_name}"',
     'record_type': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deletePermissionSetProfileRecordTypepermissionsReferences.mjs" "{profile_path}" "{record_type_name}"',
     'object': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deletePermissionSetProfileObjectpermissionsReferences.mjs" "{profile_path}" "{object_name}"',
     'class': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deletePermissionSetProfileClasspermissionsReferencesByObjectOrField.mjs" "{profile_path}" "{class_name}"',
     'apex_page': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deletePermissionSetProfileApexPagepermissionsReferencesByObjectOrField.mjs" "{profile_path}" "{apex_page_name}"',
     'flow_access': r'node "C:\\Users\\aberdun\Downloads\\rm\\Metadata Management\\Errors\deleteProfileFlowaccessesReferencesByFlow.mjs" "{profile_path}" "{flow_access_name}',
     'layout': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deletePermissionSetProfileLayoutAssignmentsReferences.mjs" "{profile_path}" "{layout_name}"',
-    'user_permission': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deletePermissionSetProfileUserPermissionsReferences.mjs" "{profile_path}" "{user_permission_name}"',
     'tab_visibility': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deletePermissionSetProfileTabVisibilitiesReferences.mjs" "{profile_path}" "{tab_name}"',
     'custom_metadata_access': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deleteCustomMetadataAccesses.mjs" "{profile_path}" "{metadata_name}"',
-    'custom_permission': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deleteCustomPermissions.mjs" "{profile_path}" "{custom_permission_name}"'
+    'custom_permission': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deleteCustomPermissions.mjs" "{profile_path}" "{custom_permission_name}"',
+    'user_permission': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deleteUserPermissions.mjs" "{profile_path}" "{user_permission_name}"'
 }
 
 def run_command(command, cwd=None, ignore_errors=False):
@@ -386,9 +386,9 @@ def extract_errors(output):
         return {}
 
     
-    # Diccionario con patrones mejorados para capturar errores
+    global error_patterns
     error_patterns = {
-    'field': r'In field:\s+field\s+-\s+no CustomField named\s+([\w\d_.-]+)\s+found',
+    'field_specific': r'In field: field - no CustomField named\s+([^.]+)\.([\w\d_]+)\s+found',
     'record_type': r'In field:\s+recordType\s+-\s+no RecordType named\s+([\w\d_.-]+)\s+found',
     'object': r'In field:\s+field\s+-\s+no CustomObject named\s+([\w\d_.-]+)\s+found',
     'class': r'In field:\s+apexClass\s+-\s+no ApexClass named\s+([\w\d_.-]+)\s+found',
@@ -399,20 +399,13 @@ def extract_errors(output):
     'tab_visibility': r'In field:\s+tab\s+-\s+no CustomTab named\s+([\w\d_.-]+)\s+found',
     'custom_metadata_access': r'In field:\s+customMetadataType\s+-\s+no CustomObject named\s+([\w\d_.-]+)\s+found',
     'custom_permission': r'In field: customPermission - no CustomPermission named\s+([\w\d_.-]+)\s+found',
-}
-
-
-    # Buscar coincidencias en la salida
+    }
     errors = {}
     for key, pattern in error_patterns.items():
         matches = re.findall(pattern, output)
         if matches:
-            errors[key] = set(matches)
+            errors[key] = matches
 
-    if not errors:
-        print("⚠ No se detectaron errores, esto puede indicar un problema con el regex o la salida del despliegue.")
-
-    print("Extracted Errors:", errors)  # Debugging output
     return errors
 
 
@@ -436,17 +429,20 @@ def process_deploymentQA():
         action_taken = False
 
         for key, items in errors.items():
-            if not items:
-                continue
-            for item_name in items:
-                item_name = normalize_text(item_name)
-                print(f'Extracted {key}:', item_name)
+            for item in items:
+                print(f'Extracted {key}:', item)
 
                 for path in [profile_path, permission_set_path]:
-                    replacement_key = 'custom_permission_name' if key == 'custom_permission' else f'{key}_name'
-                    delete_script = delete_script_templates[key].format(profile_path=path, **{replacement_key: item_name})
+                    if key == 'field_specific':
+                        object_name, field_name = item
+                        delete_script = delete_script_templates['field_specific'].format(profile_path=path, object_name=object_name, field_name=field_name)
+                    elif isinstance(item, tuple):
+                        delete_script = delete_script_templates[key].format(profile_path=path, **{f'{key}_name': item[0]})
+                    else:
+                        delete_script = delete_script_templates[key].format(profile_path=path, **{f'{key}_name': item})
+
                     print(f'Running delete script for {key} at {path}...')
-                    delete_output = run_command(delete_script)
+                    delete_output = run_command(delete_script, cwd=REPO_PATH, ignore_errors=True)
                     print('Delete script output:', delete_output)
 
                 action_taken = True
@@ -479,17 +475,65 @@ def process_deploymentPROD():
         action_taken = False
 
         for key, items in errors.items():
-            if not items:
-                continue
-            for item_name in items:
-                item_name = normalize_text(item_name)
-                print(f'Extracted {key}:', item_name)
+            for item in items:
+                print(f'Extracted {key}:', item)
 
                 for path in [profile_path, permission_set_path]:
-                    replacement_key = 'metadata_name' if key == 'custom_metadata_access' else f'{key}_name'
-                    delete_script = delete_script_templates[key].format(profile_path=path, **{replacement_key: item_name})
+                    if key == 'field_specific':
+                        object_name, field_name = item
+                        delete_script = delete_script_templates['field_specific'].format(profile_path=path, object_name=object_name, field_name=field_name)
+                    elif isinstance(item, tuple):
+                        delete_script = delete_script_templates[key].format(profile_path=path, **{f'{key}_name': item[0]})
+                    else:
+                        delete_script = delete_script_templates[key].format(profile_path=path, **{f'{key}_name': item})
+
                     print(f'Running delete script for {key} at {path}...')
-                    delete_output = run_command(delete_script)
+                    delete_output = run_command(delete_script, cwd=REPO_PATH, ignore_errors=True)
+                    print('Delete script output:', delete_output)
+
+                action_taken = True
+
+
+        if not action_taken:
+            print('No further action required.')
+            print('\a')  # Beep sound
+            fields_found = False
+
+def process_deploymentAnother():
+    deploy_command = "sf project deploy start --target-org ciclima --manifest deploy-manifest/package/package.xml --post-destructive-changes deploy-manifest/destructiveChanges/destructiveChanges.xml --dry-run --wait 240 --ignore-warnings --concise --ignore-conflicts"
+    fields_found = True
+    deployment_attempts = 0
+
+    while fields_found:
+        deployment_attempts += 1
+        print(f'Starting deployment... (Attempt {deployment_attempts})')
+
+        output = run_command(deploy_command)
+        
+        # Verificar si la salida está vacía
+        if not output.strip():
+            print("⚠ Advertencia: La salida del despliegue está vacía. Puede haber un problema con la ejecución del comando.")
+            return
+
+
+        errors = extract_errors(output)
+        action_taken = False
+
+        for key, items in errors.items():
+            for item in items:
+                print(f'Extracted {key}:', item)
+
+                for path in [profile_path, permission_set_path]:
+                    if key == 'field_specific':
+                        object_name, field_name = item
+                        delete_script = delete_script_templates['field_specific'].format(profile_path=path, object_name=object_name, field_name=field_name)
+                    elif isinstance(item, tuple):
+                        delete_script = delete_script_templates[key].format(profile_path=path, **{f'{key}_name': item[0]})
+                    else:
+                        delete_script = delete_script_templates[key].format(profile_path=path, **{f'{key}_name': item})
+
+                    print(f'Running delete script for {key} at {path}...')
+                    delete_output = run_command(delete_script, cwd=REPO_PATH, ignore_errors=True)
                     print('Delete script output:', delete_output)
 
                 action_taken = True
@@ -498,7 +542,6 @@ def process_deploymentPROD():
             print('No further action required.')
             print('\a')  # Beep sound
             fields_found = False
-
 
 
 def ejecutar_pre_push():
@@ -570,7 +613,26 @@ def ejecutar_pre_push():
             process_deploymentPROD()
 
         else:
-            print("\nNo se detectó un entorno compatible en la rama actual. Por favor, verifica la rama.")
+            print("\nLanzando contra ci/clima")
+            if setDelta:
+                print("\nGenerando delta...")
+                comandos = [
+                "git fetch --all",
+                "sf sgd source delta --from $(git log --merges -n 1 --format='%H' origin/develop) --output-dir deploy-manifest --ignore-file .deltaignore --ignore-whitespace --source-dir force-app"
+            ]
+            else:
+                comandos = [
+                    "git fetch --all"
+                ]
+            for comando in comandos:
+                print(f"Ejecutando: {comando}")
+                result = subprocess.run(comando, shell=True, text=True)
+                if result.returncode != 0:
+                    print(f"Error ejecutando el comando: {comando}")
+                    return
+
+            print("\nComandos ejecutados correctamente.")
+            process_deploymentAnother()
             return
 
     except Exception as e:
