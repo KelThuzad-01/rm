@@ -11,7 +11,7 @@ init(autoreset=True)
 
 setDelta = False
 
-PULL_REQUESTS = [ 
+PULL_REQUESTS = [ 9415
 ]  # Lista de IDs de las Pull Requests.
 
 REPO_PATH = "C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx"
@@ -325,7 +325,6 @@ def export_conflicts_to_file(repo_path, conflicts_file):
         with open(conflicts_file, "w", encoding="utf-8") as f:
             f.write(result.stdout)
 
-        print(f"Conflictos guardados en: {conflicts_file}")
     except Exception as e:
         print(f"Error guardando conflictos: {e}")
 
@@ -753,7 +752,6 @@ def compare_diff_files(original_diff_file, local_diff_file):
 
     if not discrepancies_found:
         print("No se encontraron discrepancias. Las diferencias coinciden exactamente.")
-        contar_lineas_modificadas()
 
 def compare_diff_files_with_context(file1, file2, output_file="diferencias_reportadas.txt"):
     try:
@@ -778,8 +776,6 @@ def compare_diff_files_with_context(file1, file2, output_file="diferencias_repor
             ]
 
             if filtered_differences:
-                print("\n¡Se detectaron discrepancias tras aplicar exclusiones!")
-
                 # Guardar diferencias en el archivo de reporte, excluyendo las líneas de EXCLUDE_LINES
                 with open(output_file, "w", encoding="utf-8") as report_file:
                     report_file.writelines(filtered_differences)
@@ -795,14 +791,12 @@ def compare_diff_files_with_context(file1, file2, output_file="diferencias_repor
 
 def realizar_cherry_pick_y_validar(repo, commit_id, pr_id):
     try:
-        print(f"Realizando cherry-pick del commit {commit_id}...")
         command = f'git cherry-pick -x --no-commit -m 1 {commit_id}'
         run_command(command, cwd=REPO_PATH, ignore_errors=True)
 
         archivo_conflicto = os.path.join(REPO_PATH, "config/tests-to-run.list")
         # Resolver automáticamente conflictos en `config/tests-to-run.list`
         if os.path.exists(archivo_conflicto):
-            print("Detectando conflictos en config/tests-to-run.list...")
             if resolver_conflictos_tests_to_run(archivo_conflicto):
                 run_command(f"git add {archivo_conflicto}", cwd=REPO_PATH)
                 print(f"Conflictos resueltos automáticamente y {archivo_conflicto} añadido a staged changes.")
@@ -830,7 +824,6 @@ def realizar_cherry_pick_y_validar(repo, commit_id, pr_id):
 
             local_diff_file = os.path.join(REPO_PATH, "local_diff.txt")
             export_diff_to_file(repo, None, None, local_diff_file, cached=True)
-            contar_lineas_modificadas()
             if compare_diff_files_with_context(original_diff_file, local_diff_file):
                 print("\033[32m\nNo se encontraron discrepancias.\033[0m")
                 print("Realizando commit...")
@@ -838,8 +831,7 @@ def realizar_cherry_pick_y_validar(repo, commit_id, pr_id):
                 run_command(command, cwd=REPO_PATH, ignore_errors=True)
                 break
 
-            print("\nValidando si los cambios de la pull request están correctamente integrados en el archivo local...")
-            if verificar_cambios_integrados(pull_request_file="original_diff.txt",local_diff_file="local_diff.txt",repo_path=REPO_PATH,output_file="diferencias_reportadas.txt"):
+            if verificar_cambios_integrados(original_diff_file, local_diff_file, output_file="diferencias_reportadas.txt"):
                 print("\033[32mLos cambios parecen estar integrados correctamente.\033[0m")
                 print("Realizando commit...")
                 command = f'git commit --no-verify --no-edit'
@@ -851,123 +843,80 @@ def realizar_cherry_pick_y_validar(repo, commit_id, pr_id):
                 raise Exception("Discrepancias no resueltas.")
     except Exception as e:
         print(f"Error durante el cherry-pick y validación: {e}")
-        contar_lineas_modificadas()
 
-def verificar_cambios_integrados(pull_request_file, local_diff_file, repo_path, output_file="diferencias_reportadas.txt"):
+def verificar_cambios_integrados(pull_request_file, local_diff_file, output_file="discrepancias_detectadas.txt"):
     try:
         # Leer los archivos de diferencias
         with open(pull_request_file, "r", encoding="utf-8") as pr_file:
             pr_lines = pr_file.readlines()
 
-        # Extraer líneas añadidas (verdes) y eliminadas (rojas)
-        added_lines = {line[1:].strip() for line in pr_lines if line.startswith('+') and not line.startswith('+++')}
-        removed_lines = {line[1:].strip() for line in pr_lines if line.startswith('-') and not line.startswith('---')}
+        with open(local_diff_file, "r", encoding="utf-8") as local_file:
+            local_lines = local_file.readlines()
 
-        # Identificar líneas movidas (presentes tanto en añadidas como en eliminadas)
-        moved_lines = removed_lines & added_lines
-        removed_lines -= moved_lines  # Excluir líneas movidas de las eliminadas
+        # Extraer líneas añadidas (marcadas con "+") y eliminadas (marcadas con "-") en ambos archivos
+        pr_added = {line[1:].strip() for line in pr_lines if line.startswith('+') and not line.startswith('+++')}
+        pr_removed = {line[1:].strip() for line in pr_lines if line.startswith('-') and not line.startswith('---')}
 
-        # Identificar los archivos afectados
-        file_changes = {}
+        local_added = {line[1:].strip() for line in local_lines if line.startswith('+') and not line.startswith('+++')}
+        local_removed = {line[1:].strip() for line in local_lines if line.startswith('-') and not line.startswith('---')}
+
+        # Verificar si hay líneas añadidas de más o eliminadas de menos en el cherry-pick
+        extra_added = local_added - pr_added
+        missing_added = pr_added - local_added
+        extra_removed = local_removed - pr_removed
+        missing_removed = pr_removed - local_removed
+
+        discrepancies = []
+        discrepancies_by_file = {}
+
+        # Detectar el nombre del archivo desde el diff
         current_file = None
         for line in pr_lines:
             if line.startswith("diff --git"):
-                file_path = line.split()[-1].replace("b/", "").strip()
-                current_file = os.path.normpath(file_path)
-                file_changes[current_file] = {"added": set(), "removed": set()}
-            elif line.startswith('+') and not line.startswith('+++'):
-                file_changes[current_file]["added"].add(line[1:].strip())
-            elif line.startswith('-') and not line.startswith('---'):
-                file_changes[current_file]["removed"].add(line[1:].strip())
+                current_file = line.split(" b/")[-1].strip()
+                discrepancies_by_file[current_file] = []
 
-        # Crear un reporte detallado
-        discrepancies = []
-        discrepancies.append(f"Reporte de validación entre {pull_request_file} y {local_diff_file}\n")
-        discrepancies.append("=" * 80 + "\n")
+        # Registrar discrepancias solo si existen
+        if missing_added:
+            discrepancies_by_file[current_file].append("\n🚨 **Líneas esperadas que faltan en el cherry-pick:**")
+            for line in missing_added:
+                discrepancies_by_file[current_file].append(f"  + {line}")
 
-        all_changes_integrated = True
+        if extra_added:
+            discrepancies_by_file[current_file].append("\n⚠ **Líneas añadidas de más en el cherry-pick:**")
+            for line in extra_added:
+                discrepancies_by_file[current_file].append(f"  + {line}")
 
-        for file, changes in file_changes.items():
-            file_path = os.path.join(repo_path, file)
-            # Ignorar archivos que no existen
-            if not os.path.exists(file_path):
-                continue
+        if missing_removed:
+            discrepancies_by_file[current_file].append("\n🚨 **Líneas que deberían haberse eliminado y no lo fueron:**")
+            for line in missing_removed:
+                discrepancies_by_file[current_file].append(f"  - {line}")
 
-            with open(file_path, "r", encoding="utf-8") as f:
-                local_file_content = {line.strip() for line in f.readlines()}
+        if extra_removed:
+            discrepancies_by_file[current_file].append("\n⚠ **Líneas eliminadas de más en el cherry-pick:**")
+            for line in extra_removed:
+                discrepancies_by_file[current_file].append(f"  - {line}")
 
-            # Verificar líneas añadidas
-            missing_added = changes["added"] - local_file_content
-            if missing_added:
-                all_changes_integrated = False
-                discrepancies.append(f"⚠ Líneas añadidas que faltan en el archivo \"{file_path}\":\n")
-                for line in missing_added:
-                    discrepancies.append(f"  + {line}\n")
+        # Construir el reporte con archivos que realmente tienen discrepancias
+        for file, issues in discrepancies_by_file.items():
+            if issues:
+                discrepancies.append(f"\n📂 **Archivo:** {file}")
+                discrepancies.extend(issues)
 
-            # Verificar líneas eliminadas, excluyendo líneas movidas
-            present_removed = (changes["removed"] - moved_lines) & local_file_content
-            if present_removed:
-                all_changes_integrated = False
-                discrepancies.append(f"⚠ Líneas eliminadas que aún están presentes en el archivo \"{file_path}\":\n")
-                for line in present_removed:
-                    discrepancies.append(f"  - {line}\n")
+        if discrepancies:
+            with open(output_file, "w", encoding="utf-8") as report_file:
+                report_file.writelines("\n".join(discrepancies))
 
-        # Exportar el reporte a un archivo
-        with open(output_file, "w", encoding="utf-8") as report_file:
-            report_file.writelines(discrepancies)
-
-        print(f"\n{Fore.YELLOW}Reporte de discrepancias exportado a: {output_file}{Style.RESET_ALL}")
-        return all_changes_integrated
+            print(f"\n📂 Reporte de discrepancias exportado a: {output_file}")
+            return False  # Indica que hay discrepancias
+        else:
+            print("\n✅ No se encontraron discrepancias en los cambios.")
+            return True  # Todo está correcto
 
     except Exception as e:
-        print(f"{Fore.RED}Error verificando los cambios: {e}{Style.RESET_ALL}")
+        print(f"❌ Error verificando los cambios: {e}")
         return False
 
-
-def contar_lineas_modificadas():
-    try:
-        result = subprocess.run(
-            ["git", "diff", "--numstat", "--cached"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True
-        )
-        
-        if result.stderr:
-            print(f"Error al ejecutar git diff: {result.stderr}")
-            return
-        
-        archivos = []
-        total_agregadas = 0
-        total_eliminadas = 0
-
-        for linea in result.stdout.splitlines():
-            match = re.match(r"(\d+|-)\s+(\d+|-)\s+(.*)", linea)
-            if match:
-                agregadas = int(match.group(1)) if match.group(1) != '-' else 0
-                eliminadas = int(match.group(2)) if match.group(2) != '-' else 0
-                archivo = match.group(3)
-
-                archivos.append({
-                    "archivo": archivo,
-                    "lineas_agregadas": agregadas,
-                    "lineas_eliminadas": eliminadas
-                })
-
-                total_agregadas += agregadas
-                total_eliminadas += eliminadas
-
-        print(f"{'Archivo':<50} {'Líneas Añadidas':<15} {'Líneas Eliminadas':<15}")
-        print("="*80)
-        for archivo in archivos:
-            print(f"{archivo['archivo']:<50} {archivo['lineas_agregadas']:<15} {archivo['lineas_eliminadas']:<15}")
-        
-        print("="*80)
-        print(f"{'TOTAL':<50} {total_agregadas:<15} {total_eliminadas:<15}")
-        print(f"Líneas modificadas en total (añadidas + eliminadas): {total_agregadas + total_eliminadas}")
-
-    except Exception as e:
-        print(f"Error al contar líneas modificadas: {e}")
 
 def eliminar_lineas_duplicadas(archivo):
     try:
@@ -1033,9 +982,7 @@ def main():
                 continue
 
             if len(commit_ids) > 1:
-                print("Múltiples commits encontrados. Seleccionando automáticamente el commit de merge más reciente:")
                 for i, commit_id in enumerate(commit_ids, 1):
-                    print(f"  {i}. {commit_id}")
                     commit_id = commit_ids[-1]  # Seleccionar el último commit (más reciente)
                     print(f"Seleccionado automáticamente el commit más reciente: {commit_id}")
             else:
