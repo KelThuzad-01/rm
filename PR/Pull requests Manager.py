@@ -11,7 +11,7 @@ init(autoreset=True)
 
 setDelta = False
 
-PULL_REQUESTS = [ 9415
+PULL_REQUESTS = [
 ]  # Lista de IDs de las Pull Requests.
 
 REPO_PATH = "C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx"
@@ -371,7 +371,6 @@ def resolver_conflictos_tests_to_run(archivo):
         with open(archivo, "w", encoding="utf-8") as f:
             f.write("\n".join(resolved_lines) + "\n")
 
-        print(f"Conflictos resueltos automáticamente en el archivo: {archivo}")
         return True
 
     except Exception as e:
@@ -509,7 +508,7 @@ def process_deploymentPROD():
             fields_found = False
 
 def process_deploymentAnother():
-    deploy_command = "sf project deploy start --target-org ciclima --manifest deploy-manifest/package/package.xml --post-destructive-changes deploy-manifest/destructiveChanges/destructiveChanges.xml --dry-run --wait 240 --ignore-warnings --concise --ignore-conflicts"
+    deploy_command = "sf project deploy start --target-org mobility --manifest deploy-manifest/package/package.xml --post-destructive-changes deploy-manifest/destructiveChanges/destructiveChanges.xml --dry-run --wait 240 --ignore-warnings --concise --ignore-conflicts"
     fields_found = True
     deployment_attempts = 0
 
@@ -783,7 +782,6 @@ def compare_diff_files_with_context(file1, file2, output_file="diferencias_repor
                 print(f"\n{Fore.YELLOW}Reporte de discrepancias exportado a: {output_file}{Style.RESET_ALL}")
                 return False
             else:
-                print("\n¡No se detectaron discrepancias relevantes tras aplicar exclusiones!")
                 return True
     except Exception as e:
         print(f"Error comparando archivos: {e}")
@@ -840,7 +838,29 @@ def realizar_cherry_pick_y_validar(repo, commit_id, pr_id):
 
             respuesta = input("¿Deseas intentar resolver las discrepancias nuevamente? (s/n): ").lower()
             if respuesta != "s":
-                raise Exception("Discrepancias no resueltas.")
+                # Nueva pregunta: ¿Quieres hacer commit de todas formas?
+                commit_confirm = input("¿Deseas realizar el commit con los cambios? (s/n): ").lower()
+                if commit_confirm == "s":
+                    # ✅ Intentamos obtener el mensaje del commit original
+                    commit_message = run_command(f"git log -1 --format=%B {commit_id}", cwd=REPO_PATH).strip()
+
+                    # ✅ Si no hay mensaje, usamos el PR_ID con `#` delante
+                    if not commit_message:
+                        commit_message = f"#{pr_id}"
+                        print(f"\033[33mNo se encontró mensaje en el commit original. Usando {commit_message} como mensaje de commit.\033[0m")
+
+                    # ✅ Verificamos si hay cambios en staged antes de hacer commit
+                    staged_changes = run_command("git diff --cached --name-only", cwd=REPO_PATH)
+                    if not staged_changes.strip():
+                        print("\033[33mNo hay cambios en staged. No se necesita commit.\033[0m")
+                        break
+                    
+                    commit_command = f'git commit --no-verify -m "{commit_message}"'
+                    run_command(commit_command, cwd=REPO_PATH, ignore_errors=True)
+                    break
+                else:
+                    raise Exception("Discrepancias no resueltas y commit cancelado.")
+
     except Exception as e:
         print(f"Error durante el cherry-pick y validación: {e}")
 
@@ -910,7 +930,6 @@ def verificar_cambios_integrados(pull_request_file, local_diff_file, output_file
             print(f"\n📂 Reporte de discrepancias exportado a: {output_file}")
             return False  # Indica que hay discrepancias
         else:
-            print("\n✅ No se encontraron discrepancias en los cambios.")
             return True  # Todo está correcto
 
     except Exception as e:
@@ -984,7 +1003,6 @@ def main():
             if len(commit_ids) > 1:
                 for i, commit_id in enumerate(commit_ids, 1):
                     commit_id = commit_ids[-1]  # Seleccionar el último commit (más reciente)
-                    print(f"Seleccionado automáticamente el commit más reciente: {commit_id}")
             else:
                 commit_id = commit_ids[0]
 
