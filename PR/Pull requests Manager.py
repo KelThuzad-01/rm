@@ -8,7 +8,6 @@ import unicodedata
 from colorama import Fore, Style, init
 init(autoreset=True)
 
-
 setDelta = False
 
 PULL_REQUESTS = [
@@ -441,7 +440,9 @@ def process_deploymentQA():
                         run_command(delete_script)
                         delete_script = delete_script_templates['mdt_layouts'].format(profile_path=path, object_name=item)
                     elif key == 'custom_metadata_access':
-                        delete_script = delete_script_templates[key].format(profile_path=path, metadata_name=item)  # 💡 Aquí está la corrección
+                        delete_script = delete_script_templates[key].format(profile_path=path, metadata_name=item)
+                    elif key == 'tab_visibility':  # 💡 Corrección aquí
+                        delete_script = delete_script_templates[key].format(profile_path=path, tab_name=item)
                     else:
                         delete_script = delete_script_templates[key].format(profile_path=path, **{f'{key}_name': item})
 
@@ -450,6 +451,7 @@ def process_deploymentQA():
                     print('Delete script output:', delete_output)
 
                 action_taken = True
+
 
         if not action_taken:
             print('No further action required.')
@@ -491,7 +493,9 @@ def process_deploymentPROD():
                         run_command(delete_script)
                         delete_script = delete_script_templates['mdt_layouts'].format(profile_path=path, object_name=item)
                     elif key == 'custom_metadata_access':
-                        delete_script = delete_script_templates[key].format(profile_path=path, metadata_name=item)  # 💡 Aquí está la corrección
+                        delete_script = delete_script_templates[key].format(profile_path=path, metadata_name=item)
+                    elif key == 'tab_visibility':  # 💡 Corrección aquí
+                        delete_script = delete_script_templates[key].format(profile_path=path, tab_name=item)
                     else:
                         delete_script = delete_script_templates[key].format(profile_path=path, **{f'{key}_name': item})
 
@@ -500,6 +504,7 @@ def process_deploymentPROD():
                     print('Delete script output:', delete_output)
 
                 action_taken = True
+
 
 
         if not action_taken:
@@ -540,16 +545,18 @@ def process_deploymentAnother():
                         run_command(delete_script)
                         delete_script = delete_script_templates['mdt_layouts'].format(profile_path=path, object_name=item)
                     elif key == 'custom_metadata_access':
-                        delete_script = delete_script_templates[key].format(profile_path=path, metadata_name=item)  # 💡 Aquí está la corrección
+                        delete_script = delete_script_templates[key].format(profile_path=path, metadata_name=item)
+                    elif key == 'tab_visibility':  # 💡 Corrección aquí
+                        delete_script = delete_script_templates[key].format(profile_path=path, tab_name=item)
                     else:
                         delete_script = delete_script_templates[key].format(profile_path=path, **{f'{key}_name': item})
-
 
                     print(f'Running delete script for {key} at {path}...')
                     delete_output = run_command(delete_script)
                     print('Delete script output:', delete_output)
 
                 action_taken = True
+
 
         if not action_taken:
             print('No further action required.')
