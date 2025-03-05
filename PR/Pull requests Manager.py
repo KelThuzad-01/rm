@@ -399,11 +399,12 @@ def extract_errors(output):
     'custom_metadata_access': r'In field:\s+customMetadataType\s+-\s+no CustomObject named\s+([\w\d_.-]+)\s+found',
     'custom_permission': r'In field: customPermission - no CustomPermission named\s+([\w\d_.-]+)\s+found',
     }
-    errors = {}
+    errors = {key: set() for key in error_patterns}  # Almacenar en conjuntos para evitar duplicados
+
     for key, pattern in error_patterns.items():
         matches = re.findall(pattern, output)
         if matches:
-            errors[key] = matches
+            errors[key].update(matches)  # Agregar valores únicos
 
     return errors
 
