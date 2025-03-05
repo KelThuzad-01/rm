@@ -46,7 +46,8 @@ delete_script_templates = {
     'custom_permission': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deleteCustomPermissions.mjs" "{profile_path}" "{custom_permission_name}"',
     'user_permission': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deleteUserPermissions.mjs" "{profile_path}" "{user_permission_name}"',
     'mdt_fields': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deleteMDTFieldPermissions.mjs" "{profile_path}" "{object_name}"',
-    'mdt_layouts': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deleteMDTLayoutAssignments.mjs" "{profile_path}" "{object_name}"'
+    'mdt_layouts': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deleteMDTLayoutAssignments.mjs" "{profile_path}" "{object_name}"',
+    'fix_field_permissions': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\fixFieldPermissions.mjs" "{profile_path}"'
 }
 
 def run_command(command, cwd=None, ignore_errors=False):
@@ -398,6 +399,7 @@ def extract_errors(output):
     'tab_visibility': r'In field:\s+tab\s+-\s+no CustomTab named\s+([\w\d_.-]+)\s+found',
     'custom_metadata_access': r'In field:\s+customMetadataType\s+-\s+no CustomObject named\s+([\w\d_.-]+)\s+found',
     'custom_permission': r'In field: customPermission - no CustomPermission named\s+([\w\d_.-]+)\s+found',
+    'fix_field_permissions': r'A field has to be readable to be editable'
     }
     errors = {key: set() for key in error_patterns}  # Almacenar en conjuntos para evitar duplicados
 
@@ -444,6 +446,8 @@ def process_deploymentQA():
                         delete_script = delete_script_templates[key].format(profile_path=path, metadata_name=item)
                     elif key == 'tab_visibility':  # 💡 Corrección aquí
                         delete_script = delete_script_templates[key].format(profile_path=path, tab_name=item)
+                    elif key == 'fix_field_permissions':
+                        delete_script = delete_script_templates[key].format(profile_path=path)
                     else:
                         delete_script = delete_script_templates[key].format(profile_path=path, **{f'{key}_name': item})
 
@@ -497,6 +501,8 @@ def process_deploymentPROD():
                         delete_script = delete_script_templates[key].format(profile_path=path, metadata_name=item)
                     elif key == 'tab_visibility':  # 💡 Corrección aquí
                         delete_script = delete_script_templates[key].format(profile_path=path, tab_name=item)
+                    elif key == 'fix_field_permissions':
+                        delete_script = delete_script_templates[key].format(profile_path=path)
                     else:
                         delete_script = delete_script_templates[key].format(profile_path=path, **{f'{key}_name': item})
 
@@ -514,7 +520,7 @@ def process_deploymentPROD():
             fields_found = False
 
 def process_deploymentAnother():
-    deploy_command = "sf project deploy start --target-org mobility --manifest deploy-manifest/package/package.xml --post-destructive-changes deploy-manifest/destructiveChanges/destructiveChanges.xml --dry-run --wait 240 --ignore-warnings --concise --ignore-conflicts"
+    deploy_command = "sf project deploy start --target-org solar-develop --manifest deploy-manifest/package/package.xml --post-destructive-changes deploy-manifest/destructiveChanges/destructiveChanges.xml --dry-run --wait 240 --ignore-warnings --concise --ignore-conflicts"
     fields_found = True
     deployment_attempts = 0
 
@@ -549,6 +555,8 @@ def process_deploymentAnother():
                         delete_script = delete_script_templates[key].format(profile_path=path, metadata_name=item)
                     elif key == 'tab_visibility':  # 💡 Corrección aquí
                         delete_script = delete_script_templates[key].format(profile_path=path, tab_name=item)
+                    elif key == 'fix_field_permissions':
+                        delete_script = delete_script_templates[key].format(profile_path=path)
                     else:
                         delete_script = delete_script_templates[key].format(profile_path=path, **{f'{key}_name': item})
 
