@@ -727,10 +727,10 @@ def export_diff_to_file(repo, commit_base, commit_to, output_file, cached=False)
             f.write("\n".join(filtered_lines))
 
         if not os.path.exists(output_file) or os.stat(output_file).st_size == 0:
-            raise Exception(f"El archivo {output_file} no se generó o está vacío.")
+            raise Exception(f"\033[31mEl archivo {output_file} no se generó o está vacío.\033[0m")
 
     except Exception as e:
-        print(f"Error exportando diferencias: {e}")
+        print(f"\033[31mError exportando diferencias: {e}\033[0m")
         raise
 
 def abrir_pull_request_en_navegador(pr_id):
@@ -813,7 +813,6 @@ def realizar_cherry_pick_y_validar(repo, commit_id, pr_id):
         if os.path.exists(archivo_conflicto):
             if resolver_conflictos_tests_to_run(archivo_conflicto):
                 run_command(f"git add {archivo_conflicto}", cwd=REPO_PATH)
-                print(f"Conflictos resueltos automáticamente y {archivo_conflicto} añadido a staged changes.")
 
         eliminar_lineas_duplicadas(os.path.join(REPO_PATH, "config/tests-to-run.list"))
         # Usar rutas completas para los archivos de diferencias
@@ -943,7 +942,6 @@ def verificar_cambios_integrados(pull_request_file, local_diff_file, output_file
             with open(output_file, "w", encoding="utf-8") as report_file:
                 report_file.writelines("\n".join(discrepancies))
 
-            print(f"\n📂 Reporte de discrepancias exportado a: {output_file}")
             return False  # Indica que hay discrepancias
         else:
             return True  # Todo está correcto
@@ -962,8 +960,6 @@ def eliminar_lineas_duplicadas(archivo):
         
         with open(archivo, "w", encoding="utf-8") as f:
             f.writelines(lineas_unicas)
-        
-        print(f"Archivo procesado: {archivo}. Se eliminaron líneas duplicadas.")
     
     except FileNotFoundError:
         print(f"El archivo {archivo} no existe. No se puede procesar.")
