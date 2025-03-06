@@ -842,12 +842,18 @@ def realizar_cherry_pick_y_validar(repo, commit_id, pr_id):
                 print("Realizando commit...")
                 command = f'git commit --no-verify --no-edit'
                 run_command(command, cwd=REPO_PATH, ignore_errors=True)
+                print("Realizando git reset --hard...")
+                command = f'git reset --hard'
+                run_command(command, cwd=REPO_PATH, ignore_errors=True)
                 break
 
             if verificar_cambios_integrados(original_diff_file, local_diff_file, output_file="diferencias_reportadas.txt"):
                 print("\033[32mLos cambios parecen estar integrados correctamente.\033[0m")
                 print("Realizando commit...")
                 command = f'git commit --no-verify --no-edit'
+                run_command(command, cwd=REPO_PATH, ignore_errors=True)
+                print("Realizando git reset --hard...")
+                command = f'git reset --hard'
                 run_command(command, cwd=REPO_PATH, ignore_errors=True)
                 break
 
@@ -869,15 +875,21 @@ def realizar_cherry_pick_y_validar(repo, commit_id, pr_id):
                     if not staged_changes.strip():
                         print("\033[33mNo hay cambios en staged. No se necesita commit.\033[0m")
                         break
-                    
+                    print("Realizando commit...")
                     commit_command = f'git commit --no-verify -m "{commit_message}"'
                     run_command(commit_command, cwd=REPO_PATH, ignore_errors=True)
+                    print("Realizando git reset --hard...")
+                    command = f'git reset --hard'
+                    run_command(command, cwd=REPO_PATH, ignore_errors=True)
                     break
                 else:
                     raise Exception("Discrepancias no resueltas y commit cancelado.")
 
     except Exception as e:
         print(f"Error durante el cherry-pick y validación: {e}")
+        print("Realizando git reset --hard...")
+        command = f'git reset --hard'
+        run_command(command, cwd=REPO_PATH, ignore_errors=True)
 
 def verificar_cambios_integrados(pull_request_file, local_diff_file, output_file="discrepancias_detectadas.txt"):
     try:
