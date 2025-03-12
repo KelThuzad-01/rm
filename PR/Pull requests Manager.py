@@ -16,6 +16,7 @@ PULL_REQUESTS = [
 REPO_PATH = "C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx"
 profile_path = "C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx\\force-app\\main\\default\\profiles"
 permission_set_path = "C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx\\force-app\\main\\default\\permissionsets"
+errors_log_path = r'C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\errors_list.txt'
 
 EXCLUDE_LINES = [
     "<default>false</default>", "<default>true</default>", "+++ b/", "--- a/", "force-app/main/default",
@@ -237,6 +238,31 @@ def run_command(command, cwd=None, ignore_errors=False):
     except Exception as e:
         print(f"Error comparando conflictos con original_diff: {e}")
 
+def save_errors_to_file(errors, file_path):
+    """ Guarda los errores en un archivo de texto sin borrar los anteriores. """
+    try:
+        existing_errors = load_previous_errors(file_path)
+        with open(file_path, "a", encoding="utf-8") as f:
+            for error_type, error_list in errors.items():  # Iteramos correctamente sobre los errores
+                for error in error_list:
+                    print(f'Processing {error_type}: {error}')
+                    if error not in existing_errors:
+                        f.write(error + "\n")  # Se escribe correctamente el error
+        print("✅ Errores guardados en el archivo de logs.")
+    except Exception as e:
+        print(f"⚠ Error guardando los errores en archivo: {e}")
+
+
+def load_previous_errors(file_path):
+    """Carga los errores previos desde un archivo de texto simulando la respuesta de Salesforce."""
+    if os.path.exists(file_path):
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                return "\n".join(f.readlines())  # Devuelve el contenido como si fuera la salida de Salesforce
+        except Exception as e:
+            print(f"⚠ Error cargando los errores previos: {e}")
+    return ""
+
 
 def compare_conflicts_with_original_diff(conflicts_file, original_diff_file):
     try:
@@ -413,22 +439,29 @@ def extract_errors(output):
 
 def process_deploymentQA():
     deploy_command = "sf project deploy start --target-org QA-IBD --manifest deploy-manifest/package/package.xml --post-destructive-changes deploy-manifest/destructiveChanges/destructiveChanges.xml --dry-run --wait 240 --ignore-warnings --concise --ignore-conflicts"
+    
+    previous_errors = load_previous_errors(errors_log_path)
     fields_found = True
     deployment_attempts = 0
+    errors_processed = False  # Nueva variable para evitar loops infinitos
 
     while fields_found:
+        previous_errors_output = load_previous_errors(errors_log_path)
         deployment_attempts += 1
         print(f'Starting deployment... (Attempt {deployment_attempts})')
 
-        output = run_command(deploy_command)
-        
-        # Verificar si la salida está vacía
-        if not output.strip():
-            print("⚠ Advertencia: La salida del despliegue está vacía. Puede haber un problema con la ejecución del comando.")
-            return
+        if not errors_processed and previous_errors_output.strip():
+            print("⚠ Se encontraron errores previos, reutilizando...")
+            errors = extract_errors(previous_errors_output)  # Simulamos la respuesta de Salesforce
+            errors_processed = True  # Evita reutilizar errores más de una vez
+        else:
+            output = run_command(deploy_command)
+            print('Deployment output:', output)
+            errors = extract_errors(output)
+            save_errors_to_file(errors, errors_log_path)  # Guardamos los errores para reutilizarlos
 
-        errors = extract_errors(output)
-        action_taken = False
+            print('Extracted errors:', errors)
+            action_taken = False
 
         for key, items in errors.items():
             for item in items:
@@ -467,22 +500,27 @@ def process_deploymentQA():
         
 def process_deploymentPROD():
     deploy_command = "sf project deploy start --target-org IBD-prod --manifest deploy-manifest/package/package.xml --post-destructive-changes deploy-manifest/destructiveChanges/destructiveChanges.xml --dry-run --wait 240 --ignore-warnings --concise --ignore-conflicts"
+    
+    previous_errors_output = load_previous_errors(errors_log_path)
     fields_found = True
     deployment_attempts = 0
+    errors_processed = False  # Nueva variable para evitar loops infinitos
 
     while fields_found:
         deployment_attempts += 1
         print(f'Starting deployment... (Attempt {deployment_attempts})')
 
-        output = run_command(deploy_command)
-        
-        # Verificar si la salida está vacía
-        if not output.strip():
-            print("⚠ Advertencia: La salida del despliegue está vacía. Puede haber un problema con la ejecución del comando.")
-            return
+        if not errors_processed and previous_errors_output.strip():
+            print("⚠ Se encontraron errores previos, reutilizando...")
+            errors = extract_errors(previous_errors_output)  # Simulamos la respuesta de Salesforce
+            errors_processed = True  # Evita reutilizar errores más de una vez
+        else:
+            output = run_command(deploy_command)
+            print('Deployment output:', output)
+            errors = extract_errors(output)
+            save_errors_to_file(errors, errors_log_path)  # Guardamos los errores para reutilizarlos
 
-
-        errors = extract_errors(output)
+        print('Extracted errors:', errors)
         action_taken = False
 
         for key, items in errors.items():
@@ -521,22 +559,27 @@ def process_deploymentPROD():
 
 def process_deploymentAnother():
     deploy_command = "sf project deploy start --target-org mobility --manifest deploy-manifest/package/package.xml --post-destructive-changes deploy-manifest/destructiveChanges/destructiveChanges.xml --dry-run --wait 240 --ignore-warnings --concise --ignore-conflicts"
+    
+    previous_errors_output = load_previous_errors(errors_log_path)
     fields_found = True
     deployment_attempts = 0
+    errors_processed = False  # Nueva variable para evitar loops infinitos
 
     while fields_found:
         deployment_attempts += 1
         print(f'Starting deployment... (Attempt {deployment_attempts})')
 
-        output = run_command(deploy_command)
-        
-        # Verificar si la salida está vacía
-        if not output.strip():
-            print("⚠ Advertencia: La salida del despliegue está vacía. Puede haber un problema con la ejecución del comando.")
-            return
+        if not errors_processed and previous_errors_output.strip():
+            print("⚠ Se encontraron errores previos, reutilizando...")
+            errors = extract_errors(previous_errors_output)  # Simulamos la respuesta de Salesforce
+            errors_processed = True  # Evita reutilizar errores más de una vez
+        else:
+            output = run_command(deploy_command)
+            print('Deployment output:', output)
+            errors = extract_errors(output)
+            save_errors_to_file(errors, errors_log_path)  # Guardamos los errores para reutilizarlos
 
-
-        errors = extract_errors(output)
+        print('Extracted errors:', errors)
         action_taken = False
 
         for key, items in errors.items():
@@ -577,6 +620,7 @@ def ejecutar_pre_push():
     #custom_labels_path = "force-app\\main\\default\\labels\\CustomLabels.labels-meta.xml"
     #run_command(f'node C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\removeDuplicateLabels.mjs "{custom_labels_path}"')
 
+
     """
     Detecta automáticamente el entorno de despliegue basado en la rama actual
     y ejecuta los comandos correspondientes.
@@ -595,7 +639,6 @@ def ejecutar_pre_push():
             return
 
         current_branch = result.stdout.strip()
-        print(f"Estás en la rama: {current_branch}")
 
         # Detectar entorno basado en la rama
         if "UAT2" in current_branch:
@@ -606,19 +649,14 @@ def ejecutar_pre_push():
                 "git fetch --all",
                 "sf sgd source delta --from $(git log --merges -n 1 --format='%H' origin/develop) --output-dir deploy-manifest --ignore-file .deltaignore --ignore-whitespace --source-dir force-app"
             ]
-            else:
-                comandos = [
-                    "git fetch --all"
-                ]
+                for comando in comandos:
+                    print(f"Ejecutando: {comando}")
+                    result = subprocess.run(comando, shell=True, text=True)
+                    if result.returncode != 0:
+                        print(f"Error ejecutando el comando: {comando}")
+                        return
 
-            for comando in comandos:
-                print(f"Ejecutando: {comando}")
-                result = subprocess.run(comando, shell=True, text=True)
-                if result.returncode != 0:
-                    print(f"Error ejecutando el comando: {comando}")
-                    return
-
-            print("\nComandos ejecutados correctamente.")
+                print("\nComandos ejecutados correctamente.")
             
             process_deploymentQA()
 
@@ -630,18 +668,14 @@ def ejecutar_pre_push():
                 "git fetch --all",
                 "sf sgd source delta --from $(git log --merges -n 1 --format='%H' origin/develop) --output-dir deploy-manifest --ignore-file .deltaignore --ignore-whitespace --source-dir force-app"
             ]
-            else:
-                comandos = [
-                    "git fetch --all"
-                ]
-            for comando in comandos:
-                print(f"Ejecutando: {comando}")
-                result = subprocess.run(comando, shell=True, text=True)
-                if result.returncode != 0:
-                    print(f"Error ejecutando el comando: {comando}")
-                    return
+                for comando in comandos:
+                    print(f"Ejecutando: {comando}")
+                    result = subprocess.run(comando, shell=True, text=True)
+                    if result.returncode != 0:
+                        print(f"Error ejecutando el comando: {comando}")
+                        return
 
-            print("\nComandos ejecutados correctamente.")
+                print("\nComandos ejecutados correctamente.")
             process_deploymentPROD()
 
         else:
@@ -652,18 +686,14 @@ def ejecutar_pre_push():
                 "git fetch --all",
                 "sf sgd source delta --from $(git log --merges -n 1 --format='%H' origin/develop) --output-dir deploy-manifest --ignore-file .deltaignore --ignore-whitespace --source-dir force-app"
             ]
-            else:
-                comandos = [
-                    "git fetch --all"
-                ]
-            for comando in comandos:
-                print(f"Ejecutando: {comando}")
-                result = subprocess.run(comando, shell=True, text=True)
-                if result.returncode != 0:
-                    print(f"Error ejecutando el comando: {comando}")
-                    return
+                for comando in comandos:
+                    print(f"Ejecutando: {comando}")
+                    result = subprocess.run(comando, shell=True, text=True)
+                    if result.returncode != 0:
+                        print(f"Error ejecutando el comando: {comando}")
+                        return
 
-            print("\nComandos ejecutados correctamente.")
+                print("\nComandos ejecutados correctamente.")
             process_deploymentAnother()
             return
 
@@ -942,16 +972,32 @@ def verificar_cambios_integrados(pull_request_file, local_diff_file, repo_path, 
             if os.path.exists(file_path):
                 with open(file_path, "r", encoding="utf-8") as f:
                     file_content = f.read()
-
+                
                 missing_removed = {line for line in pr_removed if line in file_content}
-
                 if missing_removed:
-                    discrepancies.append(f"\n📂 **Archivo:** {file}")
-                    discrepancies.append("\n🚨 **Líneas que deberían haberse eliminado y no lo fueron.**")
-                    discrepancies.extend(f"  - {line}" for line in missing_removed)
+                    discrepancies.append("\n🚨 **Líneas que deberían haberse eliminado y no lo fueron:**")
 
-            else:
-                print(f"⚠ Advertencia: El archivo {file} no existe en el repositorio, omitiendo verificación.")
+                    for line in missing_removed:
+                        file_path = os.path.join(repo_path, current_file)
+
+                        if os.path.exists(file_path):
+                            with open(file_path, "r", encoding="utf-8") as f:
+                                file_contents = f.readlines()
+
+                            # Contamos cuántas veces la línea aparece en el archivo después del cherry-pick
+                            count_in_file = sum(1 for l in file_contents if line.strip() in l.strip())
+
+                            # Contamos cuántas veces la línea estaba en la PR marcada para eliminarse
+                            count_removed_in_pr = sum(1 for l in pr_removed if line.strip() in l.strip())
+
+                            if count_removed_in_pr > 0:
+                                if count_in_file >= count_removed_in_pr:
+                                    # No se eliminaron todas las ocurrencias necesarias
+                                    discrepancies.append(f"  - {line}")
+                        else:
+                            # Si el archivo no existe, asumimos que se eliminó correctamente
+                            discrepancies.append(f"  - {line} (Archivo eliminado, posible eliminación correcta)")
+
 
         # Guardar el reporte de discrepancias
         if discrepancies:

@@ -1,0 +1,4 @@
+In field: field - no CustomObject named Data_Entry_Stages__mdt found
+A field has to be readable to be editable
+Unknown user permission: AdoptionAnalyticsUser
+In field: apexClass - no ApexClass named IBD_WorkOrderLockHelper found
