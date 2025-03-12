@@ -2,3 +2,39 @@ In field: field - no CustomObject named Data_Entry_Stages__mdt found
 A field has to be readable to be editable
 Unknown user permission: AdoptionAnalyticsUser
 In field: apexClass - no ApexClass named IBD_WorkOrderLockHelper found
+In field: field - no CustomObject named Estados_no_modificables_por_perfiles__mdt found
+Unknown user permission: AutonomousAnalyticsPrivacyOpportunity
+In field: field - no CustomField named Opportunity.Envio_correo_ordinario__c found
+In field: field - no CustomField named IBD_WorkOrderLock__c.OwnerId found
+In field: field - no CustomObject named IBD_IBERGO_Control_de_Estados__mdt found
+Unknown user permission: CreateUpdateSDDDataset
+In field: field - no CustomObject named IBD_Ibergo_AtoutPrixText_FR__mdt found
+In field: field - no CustomField named IBD_ProductDiscountsByPartner__c.Tipo_de_cliente__c found
+Unknown user permission: CreateUpdateSDDStory
+In field: field - no CustomObject named IBD_Ibergo_SubEstadosFirma__mdt found
+In field: apexClass - no ApexClass named HND_Callejero found
+In field: field - no CustomField named ContentVersion.SMART_DocumentCodeP8__c found
+In field: field - no CustomField named Data_Entry_Stages__mdt.Stage_list__c found
+In field: field - no CustomObject named Productos_Retribucion__c found
+In field: field - no CustomField named ServiceAppointment.IBD_ScheduleType__c found
+In field: field - no CustomField named Opportunity.IBERGO_ES_FechaAsociacionProducto__c found
+Unknown user permission: GetSmartDataDiscovery
+In field: customMetadataType - no CustomObject named Estados_no_modificables_por_perfiles__mdt found
+In field: flow - no FlowDefinition named IBERGO_FR_ECatalog found
+In field: customMetadataType - no CustomObject named Data_Entry_Stages__mdt found
+Unknown user permission: AutonomousAnalyticsPrivacy
+In field: apexClass - no ApexClass named GEN_Utility found
+Unknown user permission: GetSmartDataDiscovery
+In field: customMetadataType - no CustomObject named Estados_no_modificables_por_perfiles__mdt found
+In field: apexClass - no ApexClass named HND_Callejero found
+In field: customMetadataType - no CustomObject named IBD_IBERGO_Control_de_Estados__mdt found
+In field: customMetadataType - no CustomObject named IBD_Ibergo_SubEstadosFirma__mdt found
+In field: flow - no FlowDefinition named IberGo_France_Flow_Decision found
+In field: field - no CustomField named Opportunity.AceptacionCCGGATOUTCONFORT__c found
+In field: field - no CustomField named Opportunity.AceptacionCCGGATOUTPRIX__c found
+In field: field - no CustomField named Opportunity.Broker_Margin__c found
+In field: field - no CustomField named Opportunity.CCBB_formula__c found
+In field: field - no CustomField named Opportunity.Codigo_Credit_Check__c found
+In field: field - no CustomField named Opportunity.Codigo_Postal_Contacto__c found
+In field: field - no CustomField named Opportunity.Confirme__c found
+In field: field - no CustomField named Opportunity.ConsentimientoComunicacionesComercialAHS__c found

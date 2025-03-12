@@ -51,6 +51,43 @@ delete_script_templates = {
     'fix_field_permissions': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\fixFieldPermissions.mjs" "{profile_path}"'
 }
 
+def extract_errors(output):
+    """ Extrae solo los errores relevantes de la salida del despliegue. """
+    if not output:
+        print("⚠ Advertencia: No se recibió salida del despliegue.")
+        return {}
+
+    error_patterns = {
+        'field_specific': r'In field: field - no CustomField named\s+([^.]+)\.([\w\d_]+)\s+found',
+        'record_type': r'In field:\s+recordType\s+-\s+no RecordType named\s+([\w\d_.-]+)\s+found',
+        'object': r'In field:\s+field\s+-\s+no CustomObject named\s+([\w\d_.-]+)\s+found',
+        'class': r'In field:\s+apexClass\s+-\s+no ApexClass named\s+([\w\d_.-]+)\s+found',
+        'apex_page': r'In field:\s+apexPage\s+-\s+no ApexPage named\s+([\w\d_.-]+)\s+found',
+        'flow_access': r'In field:\s+flow\s+-\s+no FlowDefinition named\s+([\w\d_.-]+)\s+found',
+        'layout': r'In field:\s+layout\s+-\s+no Layout named\s+([\w\d_.-]+(?:\s+[\w\d_.-]+)*)\s+found',
+        'user_permission': r'Unknown user permission:\s+([\w\d_.-]+)',
+        'tab_visibility': r'In field:\s+tab\s+-\s+no CustomTab named\s+([\w\d_.-]+)\s+found',
+        'custom_metadata_access': r'In field:\s+customMetadataType\s+-\s+no CustomObject named\s+([\w\d_.-]+)\s+found',
+        'custom_permission': r'In field: customPermission - no CustomPermission named\s+([\w\d_.-]+)\s+found',
+        'fix_field_permissions': r'A field has to be readable to be editable'
+    }
+
+    errors = {key: set() for key in error_patterns.keys()}
+
+    for line in output.split("\n"):  # Recorremos línea por línea la salida del despliegue
+        for key, pattern in error_patterns.items():
+            match = re.search(pattern, line)
+            if match:
+                if key == 'field_specific':
+                    if len(match.groups()) == 2:
+                        errors[key].add((match.group(1), match.group(2)))  # Guardar como tupla (Objeto, Campo)
+                    else:
+                        print(f"⚠ Advertencia: Formato inesperado en field_specific -> {line}")
+                else:
+                    errors[key].add(match.group(1) if match.groups() else line.strip())
+
+    return errors
+
 def run_command(command, cwd=None, ignore_errors=False):
     result = subprocess.run(command, cwd=cwd, capture_output=True, text=True, shell=True, encoding="utf-8")
     
@@ -238,17 +275,32 @@ def run_command(command, cwd=None, ignore_errors=False):
     except Exception as e:
         print(f"Error comparando conflictos con original_diff: {e}")
 
+
 def save_errors_to_file(errors, file_path):
-    """ Guarda los errores en un archivo de texto sin borrar los anteriores. """
+    """ Guarda los errores en un archivo de texto sin borrar los anteriores, respetando los patrones. """
     try:
+        global error_patterns  # 🔹 Asegurar que podemos acceder a `error_patterns`
         existing_errors = load_previous_errors(file_path)
+
+        # Asegurar que `errors` es un diccionario
+        if not isinstance(errors, dict):
+            print("⚠ Advertencia: La estructura de 'errors' no es válida. Convirtiendo a diccionario...")
+            errors = {"unknown": errors}  # Si es un set, lo envolvemos en una clave
+
         with open(file_path, "a", encoding="utf-8") as f:
-            for error_type, error_list in errors.items():  # Iteramos correctamente sobre los errores
+            for key, error_list in errors.items():
                 for error in error_list:
-                    print(f'Processing {error_type}: {error}')
-                    if error not in existing_errors:
-                        f.write(error + "\n")  # Se escribe correctamente el error
-        print("✅ Errores guardados en el archivo de logs.")
+                    # Convertir en cadena los errores que sean tuplas (como field_specific)
+                    if isinstance(error, tuple):
+                        error_str = f"In field: field - no CustomField named {error[0]}.{error[1]} found"
+                    else:
+                        error_str = str(error)
+
+                    # Solo guardar errores que coincidan con los patrones esperados
+                    if key in error_patterns and error_str not in existing_errors:
+                        f.write(error_str + "\n")
+        
+        print("✅ Errores guardados en el archivo de logs correctamente.")
     except Exception as e:
         print(f"⚠ Error guardando los errores en archivo: {e}")
 
@@ -406,37 +458,6 @@ def resolver_conflictos_tests_to_run(archivo):
 def normalize_text(text):
     return unicodedata.normalize("NFC", text)
 
-def extract_errors(output):
-    if not output:
-        print("⚠ Advertencia: No se recibió salida del despliegue.")
-        return {}
-
-    
-    global error_patterns
-    error_patterns = {
-    'field_specific': r'In field: field - no CustomField named\s+([^.]+)\.([\w\d_]+)\s+found',
-    'record_type': r'In field:\s+recordType\s+-\s+no RecordType named\s+([\w\d_.-]+)\s+found',
-    'object': r'In field:\s+field\s+-\s+no CustomObject named\s+([\w\d_.-]+)\s+found',
-    'class': r'In field:\s+apexClass\s+-\s+no ApexClass named\s+([\w\d_.-]+)\s+found',
-    'apex_page': r'In field:\s+apexPage\s+-\s+no ApexPage named\s+([\w\d_.-]+)\s+found',
-    'flow_access': r'In field:\s+flow\s+-\s+no FlowDefinition named\s+([\w\d_.-]+)\s+found',
-    'layout': r'In field:\s+layout\s+-\s+no Layout named\s+([\w\d_.-]+(?:\s+[\w\d_.-]+)*)\s+found',
-    'user_permission': r'Unknown user permission:\s+([\w\d_.-]+)',
-    'tab_visibility': r'In field:\s+tab\s+-\s+no CustomTab named\s+([\w\d_.-]+)\s+found',
-    'custom_metadata_access': r'In field:\s+customMetadataType\s+-\s+no CustomObject named\s+([\w\d_.-]+)\s+found',
-    'custom_permission': r'In field: customPermission - no CustomPermission named\s+([\w\d_.-]+)\s+found',
-    'fix_field_permissions': r'A field has to be readable to be editable'
-    }
-    errors = {key: set() for key in error_patterns}  # Almacenar en conjuntos para evitar duplicados
-
-    for key, pattern in error_patterns.items():
-        matches = re.findall(pattern, output)
-        if matches:
-            errors[key].update(matches)  # Agregar valores únicos
-
-    return errors
-
-
 def process_deploymentQA():
     deploy_command = "sf project deploy start --target-org QA-IBD --manifest deploy-manifest/package/package.xml --post-destructive-changes deploy-manifest/destructiveChanges/destructiveChanges.xml --dry-run --wait 240 --ignore-warnings --concise --ignore-conflicts"
     
@@ -451,17 +472,18 @@ def process_deploymentQA():
         print(f'Starting deployment... (Attempt {deployment_attempts})')
 
         if not errors_processed and previous_errors_output.strip():
-            print("⚠ Se encontraron errores previos, reutilizando...")
-            errors = extract_errors(previous_errors_output)  # Simulamos la respuesta de Salesforce
-            errors_processed = True  # Evita reutilizar errores más de una vez
+            print("⚠ Se encontraron errores previos, reutilizando salida anterior...")
+            output = previous_errors_output
+            errors_processed = True
         else:
             output = run_command(deploy_command)
             print('Deployment output:', output)
-            errors = extract_errors(output)
-            save_errors_to_file(errors, errors_log_path)  # Guardamos los errores para reutilizarlos
+            save_errors_to_file(output, errors_log_path)  # Guardamos solo errores útiles
 
-            print('Extracted errors:', errors)
-            action_taken = False
+        errors = extract_errors(output)
+        print('Extracted errors:', errors)
+        action_taken = False
+
 
         for key, items in errors.items():
             for item in items:
@@ -507,21 +529,24 @@ def process_deploymentPROD():
     errors_processed = False  # Nueva variable para evitar loops infinitos
 
     while fields_found:
+        previous_errors_output = load_previous_errors(errors_log_path)
         deployment_attempts += 1
         print(f'Starting deployment... (Attempt {deployment_attempts})')
 
         if not errors_processed and previous_errors_output.strip():
-            print("⚠ Se encontraron errores previos, reutilizando...")
-            errors = extract_errors(previous_errors_output)  # Simulamos la respuesta de Salesforce
-            errors_processed = True  # Evita reutilizar errores más de una vez
+            print("⚠ Se encontraron errores previos, reutilizando salida anterior...")
+            output = previous_errors_output
+            errors_processed = True
         else:
             output = run_command(deploy_command)
             print('Deployment output:', output)
-            errors = extract_errors(output)
-            save_errors_to_file(errors, errors_log_path)  # Guardamos los errores para reutilizarlos
+            save_errors_to_file(output, errors_log_path)  # Guardamos solo errores útiles
 
+        errors = extract_errors(output)
         print('Extracted errors:', errors)
         action_taken = False
+
+
 
         for key, items in errors.items():
             for item in items:
@@ -566,21 +591,24 @@ def process_deploymentAnother():
     errors_processed = False  # Nueva variable para evitar loops infinitos
 
     while fields_found:
+        previous_errors_output = load_previous_errors(errors_log_path)
         deployment_attempts += 1
         print(f'Starting deployment... (Attempt {deployment_attempts})')
 
         if not errors_processed and previous_errors_output.strip():
-            print("⚠ Se encontraron errores previos, reutilizando...")
-            errors = extract_errors(previous_errors_output)  # Simulamos la respuesta de Salesforce
-            errors_processed = True  # Evita reutilizar errores más de una vez
+            print("⚠ Se encontraron errores previos, reutilizando salida anterior...")
+            output = previous_errors_output
+            errors_processed = True
         else:
             output = run_command(deploy_command)
             print('Deployment output:', output)
-            errors = extract_errors(output)
-            save_errors_to_file(errors, errors_log_path)  # Guardamos los errores para reutilizarlos
+            save_errors_to_file(output, errors_log_path)  # Guardamos solo errores útiles
 
+        errors = extract_errors(output)
         print('Extracted errors:', errors)
         action_taken = False
+
+
 
         for key, items in errors.items():
             for item in items:
