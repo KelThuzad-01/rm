@@ -520,7 +520,7 @@ def process_deploymentPROD():
             fields_found = False
 
 def process_deploymentAnother():
-    deploy_command = "sf project deploy start --target-org solar-develop --manifest deploy-manifest/package/package.xml --post-destructive-changes deploy-manifest/destructiveChanges/destructiveChanges.xml --dry-run --wait 240 --ignore-warnings --concise --ignore-conflicts"
+    deploy_command = "sf project deploy start --target-org mobility --manifest deploy-manifest/package/package.xml --post-destructive-changes deploy-manifest/destructiveChanges/destructiveChanges.xml --dry-run --wait 240 --ignore-warnings --concise --ignore-conflicts"
     fields_found = True
     deployment_attempts = 0
 
@@ -574,6 +574,9 @@ def process_deploymentAnother():
 
 
 def ejecutar_pre_push():
+    #custom_labels_path = "force-app\\main\\default\\labels\\CustomLabels.labels-meta.xml"
+    #run_command(f'node C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\removeDuplicateLabels.mjs "{custom_labels_path}"')
+
     """
     Detecta automáticamente el entorno de despliegue basado en la rama actual
     y ejecuta los comandos correspondientes.
@@ -642,7 +645,7 @@ def ejecutar_pre_push():
             process_deploymentPROD()
 
         else:
-            print("\nLanzando contra ci/clima")
+            print("\nLanzando contra otro...")
             if setDelta:
                 print("\nGenerando delta...")
                 comandos = [
@@ -847,7 +850,7 @@ def realizar_cherry_pick_y_validar(repo, commit_id, pr_id):
                 run_command(command, cwd=REPO_PATH, ignore_errors=True)
                 break
 
-            if verificar_cambios_integrados(original_diff_file, local_diff_file, output_file="diferencias_reportadas.txt"):
+            if verificar_cambios_integrados(original_diff_file, local_diff_file, REPO_PATH, output_file="diferencias_reportadas.txt"):
                 print("\033[32mLos cambios parecen estar integrados correctamente.\033[0m")
                 print("Realizando commit...")
                 command = f'git commit --no-verify --no-edit'
@@ -891,7 +894,8 @@ def realizar_cherry_pick_y_validar(repo, commit_id, pr_id):
         command = f'git reset --hard'
         run_command(command, cwd=REPO_PATH, ignore_errors=True)
 
-def verificar_cambios_integrados(pull_request_file, local_diff_file, output_file="discrepancias_detectadas.txt"):
+
+def verificar_cambios_integrados(pull_request_file, local_diff_file, repo_path, output_file="discrepancias_detectadas.txt"):
     try:
         # Leer los archivos de diferencias
         with open(pull_request_file, "r", encoding="utf-8") as pr_file:
@@ -900,62 +904,62 @@ def verificar_cambios_integrados(pull_request_file, local_diff_file, output_file
         with open(local_diff_file, "r", encoding="utf-8") as local_file:
             local_lines = local_file.readlines()
 
-        # Extraer líneas añadidas (marcadas con "+") y eliminadas (marcadas con "-") en ambos archivos
-        pr_added = {line[1:].strip() for line in pr_lines if line.startswith('+') and not line.startswith('+++')}
-        pr_removed = {line[1:].strip() for line in pr_lines if line.startswith('-') and not line.startswith('---')}
-
-        local_added = {line[1:].strip() for line in local_lines if line.startswith('+') and not line.startswith('+++')}
-        local_removed = {line[1:].strip() for line in local_lines if line.startswith('-') and not line.startswith('---')}
-
-        # Verificar si hay líneas añadidas de más o eliminadas de menos en el cherry-pick
-        extra_added = local_added - pr_added
-        missing_added = pr_added - local_added
-        extra_removed = local_removed - pr_removed
-        missing_removed = pr_removed - local_removed
-
-        discrepancies = []
+        # Diccionarios para almacenar diferencias por archivo
         discrepancies_by_file = {}
+        local_removed = {}
 
-        # Detectar el nombre del archivo desde el diff
         current_file = None
+
+        # Extraer líneas eliminadas en la PR
         for line in pr_lines:
             if line.startswith("diff --git"):
                 current_file = line.split(" b/")[-1].strip()
-                discrepancies_by_file[current_file] = []
+                discrepancies_by_file[current_file] = {"removed": set()}
+            elif current_file:
+                if line.startswith("-") and not line.startswith("---"):
+                    discrepancies_by_file[current_file]["removed"].add(line[1:].strip())
 
-        # Registrar discrepancias solo si existen
-        if missing_added:
-            discrepancies_by_file[current_file].append("\n🚨 **Líneas esperadas que faltan en el cherry-pick:**")
-            for line in missing_added:
-                discrepancies_by_file[current_file].append(f"  + {line}")
+        # Extraer líneas eliminadas en el cherry-pick
+        current_file = None
+        for line in local_lines:
+            if line.startswith("diff --git"):
+                current_file = line.split(" b/")[-1].strip()
+                if current_file not in local_removed:
+                    local_removed[current_file] = set()
+            elif current_file:
+                if line.startswith("-") and not line.startswith("---"):
+                    local_removed[current_file].add(line[1:].strip())
 
-        if extra_added:
-            discrepancies_by_file[current_file].append("\n⚠ **Líneas añadidas de más en el cherry-pick:**")
-            for line in extra_added:
-                discrepancies_by_file[current_file].append(f"  + {line}")
+        # Comparar diferencias por archivo
+        discrepancies = []
 
-        if missing_removed:
-            discrepancies_by_file[current_file].append("\n🚨 **Líneas que deberían haberse eliminado y no lo fueron:**")
-            for line in missing_removed:
-                discrepancies_by_file[current_file].append(f"  - {line}")
+        for file, changes in discrepancies_by_file.items():
+            pr_removed = changes["removed"]
+            local_removed_set = local_removed.get(file, set())
 
-        if extra_removed:
-            discrepancies_by_file[current_file].append("\n⚠ **Líneas eliminadas de más en el cherry-pick:**")
-            for line in extra_removed:
-                discrepancies_by_file[current_file].append(f"  - {line}")
+            # **Verificar si las líneas que no se eliminaron aún existen en el archivo**
+            file_path = os.path.join(repo_path, file)
+            if os.path.exists(file_path):
+                with open(file_path, "r", encoding="utf-8") as f:
+                    file_content = f.read()
 
-        # Construir el reporte con archivos que realmente tienen discrepancias
-        for file, issues in discrepancies_by_file.items():
-            if issues:
-                discrepancies.append(f"\n📂 **Archivo:** {file}")
-                discrepancies.extend(issues)
+                missing_removed = {line for line in pr_removed if line in file_content}
 
+                if missing_removed:
+                    discrepancies.append(f"\n📂 **Archivo:** {file}")
+                    discrepancies.append("\n🚨 **Líneas que deberían haberse eliminado y no lo fueron.**")
+                    discrepancies.extend(f"  - {line}" for line in missing_removed)
+
+            else:
+                print(f"⚠ Advertencia: El archivo {file} no existe en el repositorio, omitiendo verificación.")
+
+        # Guardar el reporte de discrepancias
         if discrepancies:
             with open(output_file, "w", encoding="utf-8") as report_file:
                 report_file.writelines("\n".join(discrepancies))
-
             return False  # Indica que hay discrepancias
         else:
+            print("✅ Todas las eliminaciones esperadas se realizaron correctamente.")
             return True  # Todo está correcto
 
     except Exception as e:
