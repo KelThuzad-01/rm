@@ -24,7 +24,6 @@ In field: flow - no FlowDefinition named IBERGO_FR_ECatalog found
 In field: customMetadataType - no CustomObject named Data_Entry_Stages__mdt found
 Unknown user permission: AutonomousAnalyticsPrivacy
 In field: apexClass - no ApexClass named GEN_Utility found
-Unknown user permission: GetSmartDataDiscovery
 In field: customMetadataType - no CustomObject named Estados_no_modificables_por_perfiles__mdt found
 In field: apexClass - no ApexClass named HND_Callejero found
 In field: customMetadataType - no CustomObject named IBD_IBERGO_Control_de_Estados__mdt found
@@ -38,3 +37,11 @@ In field: field - no CustomField named Opportunity.Codigo_Credit_Check__c found
 In field: field - no CustomField named Opportunity.Codigo_Postal_Contacto__c found
 In field: field - no CustomField named Opportunity.Confirme__c found
 In field: field - no CustomField named Opportunity.ConsentimientoComunicacionesComercialAHS__c found
+Unknown user permission: GetSmartDataDiscoveryExternal
+In field: apexClass - no ApexClass named IBERGO_FR_GetLogsStatusEdatalia_REST found
+In field: field - no CustomField named Productos_Retribucion__c.Valor__c found
+In field: tab - no CustomTab named Productos_Retribucion__c found
+In field: field - no CustomField named Signaturit_Factory__mdt.Metadata_Action__c found
+Unknown user permission: ManageSmartDataDiscovery
+In field: flow - no FlowDefinition named IBERGO_FR_StatusEdatalia found
+

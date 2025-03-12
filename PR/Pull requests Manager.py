@@ -51,13 +51,7 @@ delete_script_templates = {
     'fix_field_permissions': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\fixFieldPermissions.mjs" "{profile_path}"'
 }
 
-def extract_errors(output):
-    """ Extrae solo los errores relevantes de la salida del despliegue. """
-    if not output:
-        print("⚠ Advertencia: No se recibió salida del despliegue.")
-        return {}
-
-    error_patterns = {
+error_patterns = {
         'field_specific': r'In field: field - no CustomField named\s+([^.]+)\.([\w\d_]+)\s+found',
         'record_type': r'In field:\s+recordType\s+-\s+no RecordType named\s+([\w\d_.-]+)\s+found',
         'object': r'In field:\s+field\s+-\s+no CustomObject named\s+([\w\d_.-]+)\s+found',
@@ -71,6 +65,12 @@ def extract_errors(output):
         'custom_permission': r'In field: customPermission - no CustomPermission named\s+([\w\d_.-]+)\s+found',
         'fix_field_permissions': r'A field has to be readable to be editable'
     }
+
+def extract_errors(output):
+    """ Extrae solo los errores relevantes de la salida del despliegue. """
+    if not output:
+        print("⚠ Advertencia: No se recibió salida del despliegue.")
+        return {}
 
     errors = {key: set() for key in error_patterns.keys()}
 
@@ -279,27 +279,25 @@ def run_command(command, cwd=None, ignore_errors=False):
 def save_errors_to_file(errors, file_path):
     """ Guarda los errores en un archivo de texto sin borrar los anteriores, respetando los patrones. """
     try:
-        global error_patterns  # 🔹 Asegurar que podemos acceder a `error_patterns`
         existing_errors = load_previous_errors(file_path)
 
-        # Asegurar que `errors` es un diccionario
+        # Verificar si errors ya es un diccionario
         if not isinstance(errors, dict):
             print("⚠ Advertencia: La estructura de 'errors' no es válida. Convirtiendo a diccionario...")
-            errors = {"unknown": errors}  # Si es un set, lo envolvemos en una clave
+            errors = {"unknown": errors}
 
         with open(file_path, "a", encoding="utf-8") as f:
             for key, error_list in errors.items():
-                for error in error_list:
-                    # Convertir en cadena los errores que sean tuplas (como field_specific)
-                    if isinstance(error, tuple):
-                        error_str = f"In field: field - no CustomField named {error[0]}.{error[1]} found"
-                    else:
-                        error_str = str(error)
+                if isinstance(error_list, set):  # 🔹 Nos aseguramos de que es un conjunto de errores
+                    for error in error_list:
+                        if isinstance(error, tuple):  # 🔹 Manejar errores de tipo tuple
+                            error_str = f"In field: field - no CustomField named {error[0]}.{error[1]} found"
+                        else:
+                            error_str = str(error)
 
-                    # Solo guardar errores que coincidan con los patrones esperados
-                    if key in error_patterns and error_str not in existing_errors:
-                        f.write(error_str + "\n")
-        
+                        if key in error_patterns and error_str not in existing_errors:
+                            f.write(error_str + "\n")
+
         print("✅ Errores guardados en el archivo de logs correctamente.")
     except Exception as e:
         print(f"⚠ Error guardando los errores en archivo: {e}")
