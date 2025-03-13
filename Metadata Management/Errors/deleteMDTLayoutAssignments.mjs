@@ -11,10 +11,12 @@ async function eliminarLayoutAssignmentsPorMetadata(rutaCarpeta, nombreMetadata)
 
             // Expresión regular para eliminar bloques de layoutAssignments que comiencen con el nombre del metadata
             const regex = new RegExp(
-                `<layoutAssignments>\\s*<layout>${nombreMetadata}-[\\w\\s\\d_]+</layout>\\s*</layoutAssignments>`,
+                `<layoutAssignments>\\s*<layout>${nombreMetadata}-[^<]+</layout>\\s*</layoutAssignments>`,
                 'g'
             );
+            
 
+            
             let archivoModificado = data.replace(regex, '');
 
             if (archivoModificado !== data) {
