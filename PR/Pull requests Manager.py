@@ -14,6 +14,8 @@ PULL_REQUESTS = [
 ]  # Lista de IDs de las Pull Requests.
 
 REPO_PATH = "C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx"
+#git clone --branch release/UAT2_20250317 --single-branch https://alejandroberdun1@bitbucket.org/iberdrola-clientes/iberdrola-sfdx.git; git remote set-branches origin '*';git fetch --all
+#REPO_PATH = "C:\\Users\\aberdun\\Downloads\\uat2\\iberdrola-sfdx"
 profile_path = "C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx\\force-app\\main\\default\\profiles"
 permission_set_path = "C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx\\force-app\\main\\default\\permissionsets"
 errors_log_path = r'C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\errors_list.txt'
@@ -67,6 +69,37 @@ error_patterns = {
     }
 
 def extract_errors(output):
+    """Extrae los errores del despliegue y los devuelve en un diccionario."""
+    if not output:
+        print("⚠ Advertencia: No se recibió salida del despliegue.")
+        return {}
+
+    error_patterns = {
+        'field_specific': r'(In field: field - no CustomField named\s+([^.]+)\.([\w\d_]+)\s+found)',
+        'record_type': r'(In field:\s+recordType\s+-\s+no RecordType named\s+([\w\d_.-]+)\s+found)',
+        'object': r'(In field:\s+field\s+-\s+no CustomObject named\s+([\w\d_.-]+)\s+found)',
+        'class': r'(In field:\s+apexClass\s+-\s+no ApexClass named\s+([\w\d_.-]+)\s+found)',
+        'apex_page': r'(In field:\s+apexPage\s+-\s+no ApexPage named\s+([\w\d_.-]+)\s+found)',
+        'flow_access': r'(In field:\s+flow\s+-\s+no FlowDefinition named\s+([\w\d_.-]+)\s+found)',
+        'layout': r'(In field:\s+layout\s+-\s+no Layout named\s+([\w\d_.-]+(?:\s+[\w\d_.-]+)*)\s+found)',
+        'user_permission': r'(Unknown user permission:\s+([\w\d_.-]+))',
+        'tab_visibility': r'(In field:\s+tab\s+-\s+no CustomTab named\s+([\w\d_.-]+)\s+found)',
+        'custom_metadata_access': r'(In field:\s+customMetadataType\s+-\s+no CustomObject named\s+([\w\d_.-]+)\s+found)',
+        'custom_permission': r'(In field: customPermission - no CustomPermission named\s+([\w\d_.-]+)\s+found)',
+        'fix_field_permissions': r'(A field has to be readable to be editable)'
+    }
+
+    errors = {}
+    for key, pattern in error_patterns.items():
+        matches = re.findall(pattern, output)
+        for match in matches:
+            error_text = match[0]  # 🔹 Guardamos el error completo
+            if key not in errors:
+                errors[key] = set()
+            errors[key].add(error_text)  # 🔹 Guardamos la línea completa en lugar de solo la parte extraída
+
+    return errors
+
     """ Extrae solo los errores relevantes de la salida del despliegue. """
     if not output:
         print("⚠ Advertencia: No se recibió salida del despliegue.")
@@ -277,41 +310,46 @@ def run_command(command, cwd=None, ignore_errors=False):
 
 
 def save_errors_to_file(errors, file_path):
-    """ Guarda los errores en un archivo de texto sin borrar los anteriores, respetando los patrones. """
+    """ Guarda los errores en un archivo de texto sin borrar los anteriores. """
     try:
-        existing_errors = load_previous_errors(file_path)
-
-        # Verificar si errors ya es un diccionario
-        if not isinstance(errors, dict):
-            print("⚠ Advertencia: La estructura de 'errors' no es válida. Convirtiendo a diccionario...")
-            errors = {"unknown": errors}
-
-        with open(file_path, "a", encoding="utf-8") as f:
+        with open(file_path, "w", encoding="utf-8") as f:
             for key, error_list in errors.items():
-                if isinstance(error_list, set):  # 🔹 Nos aseguramos de que es un conjunto de errores
-                    for error in error_list:
-                        if isinstance(error, tuple):  # 🔹 Manejar errores de tipo tuple
-                            error_str = f"In field: field - no CustomField named {error[0]}.{error[1]} found"
-                        else:
-                            error_str = str(error)
-
-                        if key in error_patterns and error_str not in existing_errors:
-                            f.write(error_str + "\n")
-
+                for error in error_list:
+                    f.write(f"{key}: {error}\n")  # 🔹 Guardamos el tipo de error y su valor
         print("✅ Errores guardados en el archivo de logs correctamente.")
     except Exception as e:
         print(f"⚠ Error guardando los errores en archivo: {e}")
 
 
 def load_previous_errors(file_path):
-    """Carga los errores previos desde un archivo de texto simulando la respuesta de Salesforce."""
+    """Carga los errores previos desde un archivo de texto."""
+    errors = {key: set() for key in error_patterns.keys()}  # Inicializa los errores como un diccionario vacío
+    
     if os.path.exists(file_path):
         try:
             with open(file_path, "r", encoding="utf-8") as f:
-                return "\n".join(f.readlines())  # Devuelve el contenido como si fuera la salida de Salesforce
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue  # Evitar líneas vacías
+                    
+                    parts = line.split(": ", 1)  # Separa la clave del mensaje
+                    if len(parts) != 2:
+                        print(f"⚠ Formato inesperado en archivo de errores: {line}")
+                        continue
+                    
+                    key, value = parts
+                    if key in errors:
+                        # Si es field_specific, intentamos convertirlo en una tupla
+                        match = re.search(r'In field: field - no CustomField named\s+([^.]+)\.([\w\d_]+)\s+found', value)
+                        if match and key == "field_specific":
+                            errors[key].add((match.group(1), match.group(2)))
+                        else:
+                            errors[key].add(value)
         except Exception as e:
             print(f"⚠ Error cargando los errores previos: {e}")
-    return ""
+
+    return errors
 
 
 def compare_conflicts_with_original_diff(conflicts_file, original_diff_file):
@@ -458,31 +496,53 @@ def normalize_text(text):
 
 def process_deploymentQA():
     deploy_command = "sf project deploy start --target-org QA-IBD --manifest deploy-manifest/package/package.xml --post-destructive-changes deploy-manifest/destructiveChanges/destructiveChanges.xml --dry-run --wait 240 --ignore-warnings --concise --ignore-conflicts"
-    
-    previous_errors = load_previous_errors(errors_log_path)
     fields_found = True
     deployment_attempts = 0
-    errors_processed = False  # Nueva variable para evitar loops infinitos
+
+    # Cargar errores previos una sola vez
+    previous_errors_output = load_previous_errors(errors_log_path)
+    errors_processed = False  # Asegura que los errores previos solo se usen una vez
 
     while fields_found:
-        previous_errors_output = load_previous_errors(errors_log_path)
         deployment_attempts += 1
         print(f'Starting deployment... (Attempt {deployment_attempts})')
 
-        if not errors_processed and previous_errors_output.strip():
-            print("⚠ Se encontraron errores previos, reutilizando salida anterior...")
-            output = previous_errors_output
-            errors_processed = True
+        if not errors_processed and previous_errors_output:
+            print("⚠ Se encontraron errores previos, reutilizando...")
+            if isinstance(previous_errors_output, str):
+                previous_errors_output = extract_errors(previous_errors_output)  # Convertimos a diccionario si es string
+            errors = previous_errors_output or {}  # Si es None, inicializamos vacío
+            errors_processed = True  # Evita reutilizar errores más de una vez
         else:
             output = run_command(deploy_command)
-            print('Deployment output:', output)
-            print("🔹 Errores antes de guardar:", errors)  # Verifica qué errores se están pasando
-            save_errors_to_file(output, errors_log_path)  # Guardamos solo errores útiles
+            print('🔹 Deployment output:', output)
 
-        errors = extract_errors(output)
-        print('Extracted errors:', errors)
+            extracted_errors = extract_errors(output) or {}  # Aseguramos que no sea None
+            print('🔹 Extracted errors:', extracted_errors)
+
+            # 🔹 Unimos errores previos y nuevos para asegurarnos de no perder ninguno
+            errors = {}
+
+            for key in error_patterns.keys():
+                prev_errors = previous_errors_output.get(key, set()) if isinstance(previous_errors_output, dict) else set()
+                new_errors = extracted_errors.get(key, set())
+
+                cleaned_errors = set()
+                for error in new_errors:
+                    match = re.search(error_patterns[key], error)
+                    if match:
+                        if key == 'field_specific':
+                            cleaned_errors.add((match.group(1), match.group(2)))
+                        else:
+                            cleaned_errors.add(match.group(1))
+
+                errors[key] = prev_errors.union(cleaned_errors)
+
+
+            save_errors_to_file(errors, errors_log_path)  # Guardamos los errores combinados
+            print('✅ Errores final combinados:', errors)  # Confirmación de los errores que se están guardando
+
         action_taken = False
-
 
         for key, items in errors.items():
             for item in items:
@@ -493,12 +553,14 @@ def process_deploymentQA():
                         object_name, field_name = item
                         delete_script = delete_script_templates['field_specific'].format(profile_path=path, object_name=object_name, field_name=field_name)
                     elif key == 'object' and item.endswith('__mdt'):
-                        delete_script = delete_script_templates['mdt_fields'].format(profile_path=path, object_name=item)
-                        run_command(delete_script)
-                        delete_script = delete_script_templates['mdt_layouts'].format(profile_path=path, object_name=item)
+                        delete_script_fields = delete_script_templates['mdt_fields'].format(profile_path=path, object_name=item)
+                        delete_script_layouts = delete_script_templates['mdt_layouts'].format(profile_path=path, object_name=item)
+                        run_command(delete_script_fields)  # Ejecutamos después de definir ambos
+                        run_command(delete_script_layouts)
+                        continue  # Saltamos el resto para este caso
                     elif key == 'custom_metadata_access':
                         delete_script = delete_script_templates[key].format(profile_path=path, metadata_name=item)
-                    elif key == 'tab_visibility':  # 💡 Corrección aquí
+                    elif key == 'tab_visibility':  
                         delete_script = delete_script_templates[key].format(profile_path=path, tab_name=item)
                     elif key == 'fix_field_permissions':
                         delete_script = delete_script_templates[key].format(profile_path=path)
@@ -510,7 +572,6 @@ def process_deploymentQA():
                     print('Delete script output:', delete_output)
 
                 action_taken = True
-
 
         if not action_taken:
             print('No further action required.')
@@ -520,59 +581,87 @@ def process_deploymentQA():
 
         
 def process_deploymentPROD():
-    deploy_command = "sf project deploy start --target-org IBD-prod --manifest deploy-manifest/package/package.xml --post-destructive-changes deploy-manifest/destructiveChanges/destructiveChanges.xml --dry-run --wait 240 --ignore-warnings --concise --ignore-conflicts"
     
+    deploy_command = "sf project deploy start --target-org IBD-prod --manifest deploy-manifest/package/package.xml --post-destructive-changes deploy-manifest/destructiveChanges/destructiveChanges.xml --dry-run --wait 240 --ignore-warnings --concise --ignore-conflicts"
+
     fields_found = True
     deployment_attempts = 0
-    
+
     # Cargar errores previos una sola vez
     previous_errors_output = load_previous_errors(errors_log_path)
     errors_processed = False  # Asegura que los errores previos solo se usen una vez
 
-    while fields_found:  # ⚠ CORREGIDO: Ahora el bucle está dentro de la función
+    while fields_found:
         deployment_attempts += 1
         print(f'Starting deployment... (Attempt {deployment_attempts})')
 
         if not errors_processed and previous_errors_output:
             print("⚠ Se encontraron errores previos, reutilizando...")
-            errors = extract_errors(previous_errors_output)  # Simulamos la respuesta de Salesforce
+            if isinstance(previous_errors_output, str):
+                previous_errors_output = extract_errors(previous_errors_output)  # Convertimos a diccionario si es string
+            errors = previous_errors_output or {}  # Si es None, inicializamos vacío
             errors_processed = True  # Evita reutilizar errores más de una vez
         else:
             output = run_command(deploy_command)
             print('🔹 Deployment output:', output)
 
-            extracted_errors = extract_errors(output)
+            extracted_errors = extract_errors(output) or {}  # Aseguramos que no sea None
             print('🔹 Extracted errors:', extracted_errors)
 
             # 🔹 Unimos errores previos y nuevos para asegurarnos de no perder ninguno
-            errors = {key: previous_errors_output.get(key, set()).union(extracted_errors.get(key, set()))
-                      for key in error_patterns.keys()}
+            errors = {}
+
+            for key in error_patterns.keys():
+                prev_errors = previous_errors_output.get(key, set()) if isinstance(previous_errors_output, dict) else set()
+                new_errors = extracted_errors.get(key, set())
+
+                cleaned_errors = set()
+                for error in new_errors:
+                    match = re.search(error_patterns[key], error)
+                    if match:
+                        if key == 'field_specific':
+                            cleaned_errors.add((match.group(1), match.group(2)))
+                        else:
+                            cleaned_errors.add(match.group(1))
+
+                errors[key] = prev_errors.union(cleaned_errors)
+
 
             save_errors_to_file(errors, errors_log_path)  # Guardamos los errores combinados
-
             print('✅ Errores final combinados:', errors)  # Confirmación de los errores que se están guardando
 
         action_taken = False
-
-
         for key, items in errors.items():
             for item in items:
                 print(f'Extracted {key}:', item)
 
                 for path in [profile_path, permission_set_path]:
                     if key == 'field_specific':
-                        object_name, field_name = item
-                        delete_script = delete_script_templates['field_specific'].format(profile_path=path, object_name=object_name, field_name=field_name)
+                        # 🔹 Asegurar que item es una tupla
+                        if isinstance(item, tuple):
+                            object_name, field_name = item
+                        else:
+                            print(f"⚠ Formato inesperado en field_specific: {item}, ignorando...")
+                            continue  # Evitamos errores y pasamos a la siguiente iteración
+
+                        delete_script = delete_script_templates['field_specific'].format(
+                            profile_path=path, object_name=object_name, field_name=field_name
+                        )
+
                     elif key == 'object' and item.endswith('__mdt'):
                         delete_script = delete_script_templates['mdt_fields'].format(profile_path=path, object_name=item)
                         run_command(delete_script)
                         delete_script = delete_script_templates['mdt_layouts'].format(profile_path=path, object_name=item)
+
                     elif key == 'custom_metadata_access':
                         delete_script = delete_script_templates[key].format(profile_path=path, metadata_name=item)
-                    elif key == 'tab_visibility':  # 💡 Corrección aquí
+
+                    elif key == 'tab_visibility':
                         delete_script = delete_script_templates[key].format(profile_path=path, tab_name=item)
+
                     elif key == 'fix_field_permissions':
                         delete_script = delete_script_templates[key].format(profile_path=path)
+
                     else:
                         delete_script = delete_script_templates[key].format(profile_path=path, **{f'{key}_name': item})
 
@@ -580,8 +669,8 @@ def process_deploymentPROD():
                     delete_output = run_command(delete_script)
                     print('Delete script output:', delete_output)
 
-                action_taken = True
 
+                action_taken = True
 
 
         if not action_taken:
@@ -589,34 +678,56 @@ def process_deploymentPROD():
             print('\a')  # Beep sound
             fields_found = False
 
+
 def process_deploymentAnother():
     deploy_command = "sf project deploy start --target-org mobility --manifest deploy-manifest/package/package.xml --post-destructive-changes deploy-manifest/destructiveChanges/destructiveChanges.xml --dry-run --wait 240 --ignore-warnings --concise --ignore-conflicts"
-    
-    previous_errors_output = load_previous_errors(errors_log_path)
     fields_found = True
     deployment_attempts = 0
-    errors_processed = False  # Nueva variable para evitar loops infinitos
+
+    # Cargar errores previos una sola vez
+    previous_errors_output = load_previous_errors(errors_log_path)
+    errors_processed = False  # Asegura que los errores previos solo se usen una vez
 
     while fields_found:
-        previous_errors_output = load_previous_errors(errors_log_path)
         deployment_attempts += 1
         print(f'Starting deployment... (Attempt {deployment_attempts})')
 
-        if not errors_processed and previous_errors_output.strip():
-            print("⚠ Se encontraron errores previos, reutilizando salida anterior...")
-            output = previous_errors_output
-            errors_processed = True
+        if not errors_processed and previous_errors_output:
+            print("⚠ Se encontraron errores previos, reutilizando...")
+            if isinstance(previous_errors_output, str):
+                previous_errors_output = extract_errors(previous_errors_output)  # Convertimos a diccionario si es string
+            errors = previous_errors_output or {}  # Si es None, inicializamos vacío
+            errors_processed = True  # Evita reutilizar errores más de una vez
         else:
             output = run_command(deploy_command)
-            print('Deployment output:', output)
-            print("🔹 Errores antes de guardar:", errors)  # Verifica qué errores se están pasando
-            save_errors_to_file(output, errors_log_path)  # Guardamos solo errores útiles
+            print('🔹 Deployment output:', output)
 
-        errors = extract_errors(output)
-        print('Extracted errors:', errors)
+            extracted_errors = extract_errors(output) or {}  # Aseguramos que no sea None
+            print('🔹 Extracted errors:', extracted_errors)
+
+            # 🔹 Unimos errores previos y nuevos para asegurarnos de no perder ninguno
+            errors = {}
+
+            for key in error_patterns.keys():
+                prev_errors = previous_errors_output.get(key, set()) if isinstance(previous_errors_output, dict) else set()
+                new_errors = extracted_errors.get(key, set())
+
+                cleaned_errors = set()
+                for error in new_errors:
+                    match = re.search(error_patterns[key], error)
+                    if match:
+                        if key == 'field_specific':
+                            cleaned_errors.add((match.group(1), match.group(2)))
+                        else:
+                            cleaned_errors.add(match.group(1))
+
+                errors[key] = prev_errors.union(cleaned_errors)
+
+
+            save_errors_to_file(errors, errors_log_path)  # Guardamos los errores combinados
+            print('✅ Errores final combinados:', errors)  # Confirmación de los errores que se están guardando
+
         action_taken = False
-
-
 
         for key, items in errors.items():
             for item in items:
@@ -627,12 +738,14 @@ def process_deploymentAnother():
                         object_name, field_name = item
                         delete_script = delete_script_templates['field_specific'].format(profile_path=path, object_name=object_name, field_name=field_name)
                     elif key == 'object' and item.endswith('__mdt'):
-                        delete_script = delete_script_templates['mdt_fields'].format(profile_path=path, object_name=item)
-                        run_command(delete_script)
-                        delete_script = delete_script_templates['mdt_layouts'].format(profile_path=path, object_name=item)
+                        delete_script_fields = delete_script_templates['mdt_fields'].format(profile_path=path, object_name=item)
+                        delete_script_layouts = delete_script_templates['mdt_layouts'].format(profile_path=path, object_name=item)
+                        run_command(delete_script_fields)  # Ejecutamos después de definir ambos
+                        run_command(delete_script_layouts)
+                        continue  # Saltamos el resto para este caso
                     elif key == 'custom_metadata_access':
                         delete_script = delete_script_templates[key].format(profile_path=path, metadata_name=item)
-                    elif key == 'tab_visibility':  # 💡 Corrección aquí
+                    elif key == 'tab_visibility':  
                         delete_script = delete_script_templates[key].format(profile_path=path, tab_name=item)
                     elif key == 'fix_field_permissions':
                         delete_script = delete_script_templates[key].format(profile_path=path)
@@ -644,7 +757,6 @@ def process_deploymentAnother():
                     print('Delete script output:', delete_output)
 
                 action_taken = True
-
 
         if not action_taken:
             print('No further action required.')

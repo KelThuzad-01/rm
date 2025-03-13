@@ -1,51 +1,51 @@
-In field: field - no CustomObject named Data_Entry_Stages__mdt found
-A field has to be readable to be editable
-Unknown user permission: AdoptionAnalyticsUser
-In field: apexClass - no ApexClass named IBD_WorkOrderLockHelper found
-In field: field - no CustomObject named Estados_no_modificables_por_perfiles__mdt found
-Unknown user permission: AutonomousAnalyticsPrivacyOpportunity
-In field: field - no CustomField named Opportunity.Envio_correo_ordinario__c found
-In field: field - no CustomField named IBD_WorkOrderLock__c.OwnerId found
-In field: field - no CustomObject named IBD_IBERGO_Control_de_Estados__mdt found
-Unknown user permission: CreateUpdateSDDDataset
-In field: field - no CustomObject named IBD_Ibergo_AtoutPrixText_FR__mdt found
-In field: field - no CustomField named IBD_ProductDiscountsByPartner__c.Tipo_de_cliente__c found
-Unknown user permission: CreateUpdateSDDStory
-In field: field - no CustomObject named IBD_Ibergo_SubEstadosFirma__mdt found
-In field: apexClass - no ApexClass named HND_Callejero found
-In field: field - no CustomField named ContentVersion.SMART_DocumentCodeP8__c found
-In field: field - no CustomField named Data_Entry_Stages__mdt.Stage_list__c found
-In field: field - no CustomObject named Productos_Retribucion__c found
-In field: field - no CustomField named ServiceAppointment.IBD_ScheduleType__c found
-In field: field - no CustomField named Opportunity.IBERGO_ES_FechaAsociacionProducto__c found
-Unknown user permission: GetSmartDataDiscovery
-In field: customMetadataType - no CustomObject named Estados_no_modificables_por_perfiles__mdt found
-In field: flow - no FlowDefinition named IBERGO_FR_ECatalog found
-In field: customMetadataType - no CustomObject named Data_Entry_Stages__mdt found
-Unknown user permission: AutonomousAnalyticsPrivacy
-In field: apexClass - no ApexClass named GEN_Utility found
-In field: customMetadataType - no CustomObject named Estados_no_modificables_por_perfiles__mdt found
-In field: apexClass - no ApexClass named HND_Callejero found
-In field: customMetadataType - no CustomObject named IBD_IBERGO_Control_de_Estados__mdt found
-In field: customMetadataType - no CustomObject named IBD_Ibergo_SubEstadosFirma__mdt found
-In field: flow - no FlowDefinition named IberGo_France_Flow_Decision found
-In field: field - no CustomField named Opportunity.AceptacionCCGGATOUTCONFORT__c found
-In field: field - no CustomField named Opportunity.AceptacionCCGGATOUTPRIX__c found
-In field: field - no CustomField named Opportunity.Broker_Margin__c found
-In field: field - no CustomField named Opportunity.CCBB_formula__c found
-In field: field - no CustomField named Opportunity.Codigo_Credit_Check__c found
-In field: field - no CustomField named Opportunity.Codigo_Postal_Contacto__c found
-In field: field - no CustomField named Opportunity.Confirme__c found
-In field: field - no CustomField named Opportunity.ConsentimientoComunicacionesComercialAHS__c found
-Unknown user permission: GetSmartDataDiscoveryExternal
-In field: apexClass - no ApexClass named IBERGO_FR_GetLogsStatusEdatalia_REST found
-In field: field - no CustomField named Productos_Retribucion__c.Valor__c found
-In field: tab - no CustomTab named Productos_Retribucion__c found
-In field: field - no CustomField named Signaturit_Factory__mdt.Metadata_Action__c found
-Unknown user permission: ManageSmartDataDiscovery
-In field: flow - no FlowDefinition named IBERGO_FR_StatusEdatalia found
-In field: layout - no Layout named Ibergo_SP_AnalizarProceso__mdt-Formato Ibergo_SP_AnalizarProceso found
-Unknown user permission: ManageSmartDataDiscoveryModel
-In field: layout - no Layout named Productos_Retribucion__c-Formato Producto - Retribución found
-Unknown user permission: ShareSmartDataDiscoveryStory
-
+field_specific: ('Signaturit_Factory__mdt', 'Metadata_Action__c')
+field_specific: ('Opportunity', 'Codigo_Postal_Contacto__c')
+field_specific: ('ContentVersion', 'SMART_DocumentCodeP8__c')
+field_specific: ('IBD_WorkOrderLock__c', 'OwnerId')
+field_specific: ('Opportunity', 'Envio_correo_ordinario__c')
+field_specific: ('Opportunity', 'ConsentimientoComunicacionesComercialAHS__c')
+field_specific: ('Opportunity', 'AceptacionCCGGATOUTPRIX__c')
+field_specific: ('Opportunity', 'IBERGO_ES_FechaAsociacionProducto__c')
+field_specific: ('Opportunity', 'Codigo_Credit_Check__c')
+field_specific: ('Opportunity', 'Envio_correo_ordinario__c')
+field_specific: ('IBD_WorkOrderLock__c', 'OwnerId')
+field_specific: ('Data_Entry_Stages__mdt', 'Stage_list__c')
+field_specific: ('Opportunity', 'Broker_Margin__c')
+field_specific: ('Opportunity', 'AceptacionCCGGATOUTCONFORT__c')
+field_specific: ('Opportunity', 'CCBB_formula__c')
+field_specific: ('ServiceAppointment', 'IBD_ScheduleType__c')
+field_specific: ('IBD_ProductDiscountsByPartner__c', 'Tipo_de_cliente__c')
+field_specific: ('Productos_Retribucion__c', 'Valor__c')
+field_specific: ('Opportunity', 'Confirme__c')
+object: In field: field - no CustomObject named Productos_Retribucion__c found
+class: In field: apexClass - no ApexClass named IBERGO_FR_GetLogsStatusEdatalia_REST found
+class: In field: apexClass - no ApexClass named GEN_Utility found
+class: In field: apexClass - no ApexClass named IBD_WorkOrderLockHelper found
+class: In field: apexClass - no ApexClass named HND_Callejero found
+class: In field: apexClass - no ApexClass named HND_IBD_WorkOrderLock found
+flow_access: In field: flow - no FlowDefinition named IberGo_France_Flow_Decision found
+flow_access: In field: flow - no FlowDefinition named IBERGO_FR_StatusEdatalia found
+flow_access: In field: flow - no FlowDefinition named IBERGO_FR_ECatalog found
+layout: In field: layout - no Layout named Productos_Retribucion__c-Formato Producto - Retribución found
+layout: In field: layout - no Layout named Ibergo_SP_AnalizarProceso__mdt-Formato Ibergo_SP_AnalizarProceso found
+user_permission: Unknown user permission: AdoptionAnalyticsUser
+user_permission: Unknown user permission: AutonomousAnalyticsPrivacy
+user_permission: Unknown user permission: CreateUpdateSDDStory
+user_permission: Unknown user permission: ManageSmartDataDiscovery
+user_permission: Unknown user permission: GetSmartDataDiscoveryExternal
+user_permission: Unknown user permission: CreateUpdateSDDDataset
+user_permission: Unknown user permission: ManageSmartDataDiscoveryModel
+user_permission: Unknown user permission: ShareSmartDataDiscoveryStory
+user_permission: Unknown user permission: GetSmartDataDiscovery
+user_permission: Unknown user permission: AutonomousAnalyticsPrivacyOpportunity
+tab_visibility: In field: tab - no CustomTab named Productos_Retribucion__c found
+custom_metadata_access: In field: customMetadataType - no CustomObject named IBD_IBERGO_Control_de_Estados__mdt found
+custom_metadata_access: In field: customMetadataType - no CustomObject named Data_Entry_Stages__mdt found
+custom_metadata_access: In field: customMetadataType - no CustomObject named Estados_no_modificables_por_perfiles__mdt found
+custom_metadata_access: In field: customMetadataType - no CustomObject named IBD_Ibergo_SubEstadosFirma__mdt found
+custom_metadata_access: In field: customMetadataType - no CustomObject named IBD_Ibergo_AtoutPrixText_FR__mdt found
+custom_metadata_access: In field: customMetadataType - no CustomObject named IBD_Ibergo_SubEstadosFirma__mdt found
+custom_metadata_access: In field: customMetadataType - no CustomObject named Data_Entry_Stages__mdt found
+custom_metadata_access: In field: customMetadataType - no CustomObject named IBD_IBERGO_Control_de_Estados__mdt found
+custom_metadata_access: In field: customMetadataType - no CustomObject named Estados_no_modificables_por_perfiles__mdt found
+custom_metadata_access: In field: customMetadataType - no CustomObject named IBD_IBERGO_Control_de_Estados__mdt
