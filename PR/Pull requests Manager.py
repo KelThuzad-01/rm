@@ -476,6 +476,7 @@ def process_deploymentQA():
         else:
             output = run_command(deploy_command)
             print('Deployment output:', output)
+            print("🔹 Errores antes de guardar:", errors)  # Verifica qué errores se están pasando
             save_errors_to_file(output, errors_log_path)  # Guardamos solo errores útiles
 
         errors = extract_errors(output)
@@ -521,29 +522,37 @@ def process_deploymentQA():
 def process_deploymentPROD():
     deploy_command = "sf project deploy start --target-org IBD-prod --manifest deploy-manifest/package/package.xml --post-destructive-changes deploy-manifest/destructiveChanges/destructiveChanges.xml --dry-run --wait 240 --ignore-warnings --concise --ignore-conflicts"
     
-    previous_errors_output = load_previous_errors(errors_log_path)
     fields_found = True
     deployment_attempts = 0
-    errors_processed = False  # Nueva variable para evitar loops infinitos
+    
+    # Cargar errores previos una sola vez
+    previous_errors_output = load_previous_errors(errors_log_path)
+    errors_processed = False  # Asegura que los errores previos solo se usen una vez
 
-    while fields_found:
-        previous_errors_output = load_previous_errors(errors_log_path)
+    while fields_found:  # ⚠ CORREGIDO: Ahora el bucle está dentro de la función
         deployment_attempts += 1
         print(f'Starting deployment... (Attempt {deployment_attempts})')
 
-        if not errors_processed and previous_errors_output.strip():
-            print("⚠ Se encontraron errores previos, reutilizando salida anterior...")
-            output = previous_errors_output
-            errors_processed = True
+        if not errors_processed and previous_errors_output:
+            print("⚠ Se encontraron errores previos, reutilizando...")
+            errors = extract_errors(previous_errors_output)  # Simulamos la respuesta de Salesforce
+            errors_processed = True  # Evita reutilizar errores más de una vez
         else:
             output = run_command(deploy_command)
-            print('Deployment output:', output)
-            save_errors_to_file(output, errors_log_path)  # Guardamos solo errores útiles
+            print('🔹 Deployment output:', output)
 
-        errors = extract_errors(output)
-        print('Extracted errors:', errors)
+            extracted_errors = extract_errors(output)
+            print('🔹 Extracted errors:', extracted_errors)
+
+            # 🔹 Unimos errores previos y nuevos para asegurarnos de no perder ninguno
+            errors = {key: previous_errors_output.get(key, set()).union(extracted_errors.get(key, set()))
+                      for key in error_patterns.keys()}
+
+            save_errors_to_file(errors, errors_log_path)  # Guardamos los errores combinados
+
+            print('✅ Errores final combinados:', errors)  # Confirmación de los errores que se están guardando
+
         action_taken = False
-
 
 
         for key, items in errors.items():
@@ -600,6 +609,7 @@ def process_deploymentAnother():
         else:
             output = run_command(deploy_command)
             print('Deployment output:', output)
+            print("🔹 Errores antes de guardar:", errors)  # Verifica qué errores se están pasando
             save_errors_to_file(output, errors_log_path)  # Guardamos solo errores útiles
 
         errors = extract_errors(output)

@@ -44,4 +44,5 @@ In field: tab - no CustomTab named Productos_Retribucion__c found
 In field: field - no CustomField named Signaturit_Factory__mdt.Metadata_Action__c found
 Unknown user permission: ManageSmartDataDiscovery
 In field: flow - no FlowDefinition named IBERGO_FR_StatusEdatalia found
-
+In field: layout - no Layout named Ibergo_SP_AnalizarProceso__mdt-Formato Ibergo_SP_AnalizarProceso found
+Unknown user permission: ManageSmartDataDiscoveryModel
