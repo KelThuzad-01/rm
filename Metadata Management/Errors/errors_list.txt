@@ -46,3 +46,6 @@ Unknown user permission: ManageSmartDataDiscovery
 In field: flow - no FlowDefinition named IBERGO_FR_StatusEdatalia found
 In field: layout - no Layout named Ibergo_SP_AnalizarProceso__mdt-Formato Ibergo_SP_AnalizarProceso found
 Unknown user permission: ManageSmartDataDiscoveryModel
+In field: layout - no Layout named Productos_Retribucion__c-Formato Producto - Retribución found
+Unknown user permission: ShareSmartDataDiscoveryStory
+
