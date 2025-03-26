@@ -32,7 +32,39 @@ def obtener_commit_de_pr(pr_id):
         return None
     return commit_ids[-1]
 
-def formatear_conflicto_manual(current_block, incoming_block):
+from colorama import Fore, Style
+
+def generar_ayuda_manual_general(current_block, incoming_block, archivo, conflicto_num):
+    ayuda = []
+
+    ayuda.append(f"\n📂 Archivo: {archivo}")
+    ayuda.append(f"\033[35m🔹 Conflicto {conflicto_num}:\033[0m\n")
+
+    ayuda.append(f"\033[33m🔻 Código actual (HEAD):\033[0m")
+    for line in current_block:
+        ayuda.append(f"   {line}")
+
+    ayuda.append(f"\n\033[36m🆚\033[0m\n")
+
+    ayuda.append(f"\033[32m🔺 Código propuesto por la PR:\033[0m")
+    for line in incoming_block:
+        ayuda.append(f"   {line}")
+
+    ayuda.append(f"\n\033[36m📌 Notas:\033[0m")
+    ayuda.append(f"• El bloque actual y el bloque de la PR son significativamente diferentes.")
+    ayuda.append(f"• No hay líneas marcadas como eliminadas en la PR que coincidan exactamente con las del bloque actual.")
+    ayuda.append(f"• Es probable que la PR reemplace lógica existente por otra simplificada o alternativa.")
+
+    ayuda.append(f"\n\033[36m🔧 Consejos para resolver:\033[0m")
+    ayuda.append(f"✔ Asegúrate de no eliminar líneas que no han sido eliminadas en la PR.")
+    ayuda.append(f"✔ Verifica si las líneas nuevas ya están presentes antes de añadirlas.")
+    ayuda.append(f"✔ Si hay dudas, fusiona cuidadosamente ambas versiones o consulta al autor de la PR.")
+
+    ayuda.append(f"{Fore.BLUE}✅ Acción recomendada: Resolución manual requerida.{Style.RESET_ALL}")
+
+    return ayuda
+
+def formatear_conflicto_manual(current_block, incoming_block, archivo=None, conflicto_num=None, verdes=None, rojas=None):
     conflicto = []
 
     conflicto.append(f"{Fore.YELLOW}🔻 Comienzo del conflicto (versión actual - HEAD){Style.RESET_ALL}")
@@ -41,10 +73,24 @@ def formatear_conflicto_manual(current_block, incoming_block):
     conflicto.append(f"{Fore.MAGENTA}\n🔼 Incoming (desde la Pull Request){Style.RESET_ALL}")
     conflicto.extend([f"   {line}" for line in incoming_block])
     conflicto.append(f"{Fore.GREEN}🔺 Fin del conflicto{Style.RESET_ALL}\n")
+
+    # Añadimos mensaje y líneas verdes/rojas si las hay
     conflicto.append(f"{Fore.CYAN}💡 Sugerencia: La línea actual no coincide con la eliminada en la PR. Revisión detallada requerida.{Style.RESET_ALL}")
-    conflicto.append(f"{Fore.BLUE}✅ Acción recomendada: Resolución manual requerida.{Style.RESET_ALL}\n")
+    conflicto.append(f"{Fore.BLUE}✅ Acción recomendada: Resolución manual requerida.{Style.RESET_ALL}")
+
+    if verdes or rojas:
+        if rojas:
+            conflicto.append(f"{Fore.RED}🔻 Líneas eliminadas en la PR (rojas):{Style.RESET_ALL}")
+            for l in rojas:
+                conflicto.append(f"{Fore.RED}- {l.strip()}{Style.RESET_ALL}")
+        if verdes:
+            conflicto.append(f"{Fore.GREEN}🔺 Líneas añadidas en la PR (verdes):{Style.RESET_ALL}")
+            for l in verdes:
+                conflicto.append(f"{Fore.GREEN}+ {l.strip()}{Style.RESET_ALL}")
 
     return conflicto
+
+
 
 def filtrar_conflictos_validos(conflictos):
     vistos = set()
@@ -159,7 +205,6 @@ def analizar_conflictos(conflict_files):
         file_path = os.path.normpath(os.path.join(REPO_PATH, file))
         try:
             import chardet
-            # Detectar encoding primero
             with open(file_path, "rb") as raw:
                 result = chardet.detect(raw.read(10000))
                 encoding = result["encoding"] or "utf-8"
@@ -170,7 +215,6 @@ def analizar_conflictos(conflict_files):
             print(f"{Fore.RED}❌ Error abriendo archivo con conflicto: {file_path} → {e}{Style.RESET_ALL}")
             continue
 
-        
         file_conflicts = []
         resumen_acciones = set()
 
@@ -211,23 +255,36 @@ def analizar_conflictos(conflict_files):
                 conflicto.append(f"{Fore.GREEN}🔺 Fin del conflicto{Style.RESET_ALL}\n")
                 conflictos_en_archivo += 1
 
-                # Decidir acción recomendada
-                if incoming_block and not current_block:
-                    resumen_acciones.add("incoming")
-                    conflicto.append(f"{Fore.BLUE}✅ Acción recomendada: Aceptar Incoming (PR).{Style.RESET_ALL}\n")
-                elif current_block and not incoming_block:
-                    resumen_acciones.add("current")
-                    conflicto.append(f"{Fore.BLUE}✅ Acción recomendada: Mantener Current (rama actual).{Style.RESET_ALL}\n")
-                elif current_block == incoming_block:
-                    resumen_acciones.add("igual")
-                    conflicto.append(f"{Fore.BLUE}✅ Acción recomendada: Cualquiera es válida (ambas versiones son iguales).{Style.RESET_ALL}\n")
-                elif all(line not in incoming_block for line in current_block):
-                    resumen_acciones.add("combinar")
-                    conflicto.append(f"{Fore.CYAN}💡 Sugerencia: Ninguna línea actual aparece como eliminada en la PR. Recomendado combinar ambas versiones.{Style.RESET_ALL}")
-                    conflicto.append(f"{Fore.BLUE}✅ Acción recomendada: Combinar cambios (mantener ambas líneas){Style.RESET_ALL}\n")
+                mensaje, tipo_accion = analizar_conflicto(current_block, incoming_block)
+                resumen_acciones.add(tipo_accion)
+
+                if tipo_accion == "manual":
+                    conflicto_manual = formatear_conflicto_manual(current_block, incoming_block, archivo=file, conflicto_num=conflicto_num)
+
+                    # Extraer líneas verdes y rojas
+                    verdes = [l for l in incoming_block if l.strip() not in map(str.strip, current_block)]
+                    rojas = [l for l in current_block if l.strip() not in map(str.strip, incoming_block)]
+
+                    # Insertarlas debajo del mensaje
+                    for idx, line in enumerate(conflicto_manual):
+                        if "✅ Acción recomendada: Resolución manual requerida." in line:
+                            insert_pos = idx + 1
+                            break
+                    else:
+                        insert_pos = len(conflicto_manual)
+
+                    conflicto_manual[insert_pos:insert_pos] = [
+                        f"{Fore.RED}🔻 Líneas eliminadas en la PR (rojas):{Style.RESET_ALL}"] + [
+                        f"{Fore.RED}- {l.strip()}{Style.RESET_ALL}" for l in rojas]
+                    insert_pos += len(rojas) + 1
+
+                    conflicto_manual[insert_pos:insert_pos] = [
+                        f"{Fore.GREEN}🔺 Líneas añadidas en la PR (verdes):{Style.RESET_ALL}"] + [
+                        f"{Fore.GREEN}+ {l.strip()}{Style.RESET_ALL}" for l in verdes]
+
+                    conflicto.extend(conflicto_manual)
                 else:
-                    resumen_acciones.add("manual")
-                    conflicto.extend(formatear_conflicto_manual(current_block, incoming_block))
+                    conflicto.append(f"{Fore.CYAN}{mensaje}{Style.RESET_ALL}")
 
                 file_conflicts.extend(conflicto)
                 conflicto = []
@@ -246,29 +303,24 @@ def analizar_conflictos(conflict_files):
 
             i += 1
 
-        # 👉 Antes de extender el reporte, filtramos conflictos inválidos o duplicados
-        file_conflicts_raw = file_conflicts  # Guarda el original si necesitas depurar
-        conflictos_limpios = filtrar_conflictos_validos(extraer_conflictos(file_conflicts))
-        file_conflicts = renderizar_conflictos(conflictos_limpios)
+        # Si no hay conflictos manuales, aplicar limpieza
+        if all("Resolución manual requerida" not in line for line in file_conflicts):
+            file_conflicts_raw = file_conflicts  # Depuración
+            conflictos_limpios = filtrar_conflictos_validos(extraer_conflictos(file_conflicts))
+            file_conflicts = renderizar_conflictos(conflictos_limpios)
 
+        conflicts_report.append(f"\n📂 Archivo: {file}")
         if conflictos_en_archivo == 1:
             if resumen_acciones == {"incoming"}:
-                conflicts_report.append(f"\n📂 Archivo: {file}")
                 conflicts_report.append(f"{Fore.BLUE}✅ Todos los conflictos pueden resolverse aceptando Incoming (PR).{Style.RESET_ALL}\n")
             elif resumen_acciones == {"current"}:
-                conflicts_report.append(f"\n📂 Archivo: {file}")
                 conflicts_report.append(f"{Fore.BLUE}✅ Todos los conflictos pueden resolverse manteniendo Current (rama actual).{Style.RESET_ALL}\n")
             elif resumen_acciones.issubset({"incoming", "current", "igual"}):
-                conflicts_report.append(f"\n📂 Archivo: {file}")
                 conflicts_report.append(f"{Fore.BLUE}✅ Todos los conflictos pueden resolverse automáticamente (Incoming o Current).{Style.RESET_ALL}\n")
             else:
-                conflicts_report.append(f"\n📂 Archivo: {file}")
                 conflicts_report.extend(file_conflicts)
         else:
-            # Si hay más de un conflicto, mostrar todo en detalle, incluso si todos son automáticos
-            conflicts_report.append(f"\n📂 Archivo: {file}")
             conflicts_report.extend(file_conflicts)
-
 
     path_out = os.path.join(REPO_PATH, "conflicts_resolution_guide.txt")
     with open(path_out, "w", encoding="utf-8") as f:
