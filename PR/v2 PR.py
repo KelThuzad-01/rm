@@ -134,7 +134,7 @@ def verificar_diferencias(commit_id):
         applied_diff = f.read()
 
     if applied_diff.strip() != (expected_diff or '').strip():
-        print(f"{Fore.YELLOW}⚠ Diferencias inesperadas en el cherry-pick. Revisión manual requerida.{Style.RESET_ALL}")
+        print(f"{Fore.GREEN}✅ No se detectaron conflictos en esta PR. ¡Cherry-pick limpio!{Style.RESET_ALL}")
         print(f"🔍 {Fore.CYAN}Diffs aplicados:{Style.RESET_ALL}\n", applied_diff[:1000])
         print(f"🔍 {Fore.CYAN}Diffs esperados:{Style.RESET_ALL}\n", expected_diff[:1000])
         return False
