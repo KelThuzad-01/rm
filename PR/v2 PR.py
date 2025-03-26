@@ -11,7 +11,7 @@ init(autoreset=True)  # Para usar colores en PowerShell
 REPO_PATH = "C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx"
 
 # Lista de Pull Requests a aplicar (ordenada de menor a mayor)
-PULL_REQUESTS = sorted([9858])  # Reemplazar con PRs reales
+PULL_REQUESTS = sorted([9201, 9818, 9761, 9811])  # Reemplazar con PRs reales
 
 def run_command(command, cwd=REPO_PATH, ignore_errors=False):
     try:
@@ -253,10 +253,13 @@ def analizar_conflictos(conflict_files):
 
         if conflictos_en_archivo == 1:
             if resumen_acciones == {"incoming"}:
+                conflicts_report.append(f"\n📂 Archivo: {file}")
                 conflicts_report.append(f"{Fore.BLUE}✅ Todos los conflictos pueden resolverse aceptando Incoming (PR).{Style.RESET_ALL}\n")
             elif resumen_acciones == {"current"}:
+                conflicts_report.append(f"\n📂 Archivo: {file}")
                 conflicts_report.append(f"{Fore.BLUE}✅ Todos los conflictos pueden resolverse manteniendo Current (rama actual).{Style.RESET_ALL}\n")
             elif resumen_acciones.issubset({"incoming", "current", "igual"}):
+                conflicts_report.append(f"\n📂 Archivo: {file}")
                 conflicts_report.append(f"{Fore.BLUE}✅ Todos los conflictos pueden resolverse automáticamente (Incoming o Current).{Style.RESET_ALL}\n")
             else:
                 conflicts_report.append(f"\n📂 Archivo: {file}")
@@ -296,8 +299,9 @@ def aplicar_cherry_pick(repo, commit_id, pr_id):
         if not identificar_conflictos():
             run_command("git cherry-pick --abort")
 
-    input(f"{Fore.BLUE}🔹 Presiona ENTER para hacer commit y continuar con el siguiente cherry-pick...{Style.RESET_ALL}")
-    
+    input(f"PR actual: #{pr_id} {Fore.BLUE}🔹 Presiona ENTER para hacer commit y continuar con el siguiente cherry-pick...{Style.RESET_ALL}")
+    run_command("python 'C:\\Users\\aberdun\\Downloads\\rm\\PR\\verificar_cambios_cherry_pick.py'")
+
     # Realizar el commit automático
     run_command("git commit --no-verify --no-edit")
 
