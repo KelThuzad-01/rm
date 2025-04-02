@@ -11,7 +11,7 @@ init(autoreset=True)  # Para usar colores en PowerShell
 REPO_PATH = "C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx"
 
 # Lista de Pull Requests a aplicar (ordenada de menor a mayor)
-PULL_REQUESTS = sorted([9201, 9818, 9761, 9811])  # Reemplazar con PRs reales
+PULL_REQUESTS = sorted([9878])  # Reemplazar con PRs reales
 
 def run_command(command, cwd=REPO_PATH, ignore_errors=False):
     try:
@@ -37,7 +37,9 @@ from colorama import Fore, Style
 def generar_ayuda_manual_general(current_block, incoming_block, archivo, conflicto_num):
     ayuda = []
 
+    ayuda.append(f"------------------------------------------------")
     ayuda.append(f"\n📂 Archivo: {archivo}")
+    ayuda.append(f"------------------------------------------------")
     ayuda.append(f"\033[35m🔹 Conflicto {conflicto_num}:\033[0m\n")
 
     ayuda.append(f"\033[33m🔻 Código actual (HEAD):\033[0m")
@@ -156,15 +158,18 @@ def analizar_conflicto(current_block, incoming_block):
         return "✅ Acción recomendada: Mantener Current (rama actual).", "current"
     elif current_set == incoming_set:
         return "✅ Acción recomendada: Cualquiera es válida (ambas versiones son iguales).", "igual"
+    elif current_set.isdisjoint(incoming_set):
+        # 🔧 VSCode no sugiere combinar automáticamente, pero es lo ideal
+        return (
+            "💡 Sugerencia: No hay líneas en común. Recomendado combinar ambas versiones.",
+            "manual-combinar"
+        )
     elif incoming_set.issubset(current_set):
         return "💡 Sugerencia: La PR solo añade líneas ya presentes. Recomendado mantener Current.", "current"
     elif current_set.issubset(incoming_set):
         return "💡 Sugerencia: La PR añade nuevas líneas sin eliminar ninguna. Recomendado combinar.", "combinar"
-    elif current_set.isdisjoint(incoming_set):
-        return "💡 Sugerencia: No hay líneas en común. Combina ambas versiones si es necesario.", "combinar"
     else:
         return "💡 Sugerencia: Analiza cuidadosamente qué líneas deseas mantener.", "manual"
-
 
 
 def verificar_diferencias(commit_id):
@@ -258,7 +263,8 @@ def analizar_conflictos(conflict_files):
                 mensaje, tipo_accion = analizar_conflicto(current_block, incoming_block)
                 resumen_acciones.add(tipo_accion)
 
-                if tipo_accion == "manual":
+                
+                if tipo_accion in {"manual", "manual-combinar"}:
                     conflicto_manual = formatear_conflicto_manual(current_block, incoming_block, archivo=file, conflicto_num=conflicto_num)
 
                     # Extraer líneas verdes y rojas
@@ -309,18 +315,13 @@ def analizar_conflictos(conflict_files):
             conflictos_limpios = filtrar_conflictos_validos(extraer_conflictos(file_conflicts))
             file_conflicts = renderizar_conflictos(conflictos_limpios)
 
+        # ✅ Mostrar siempre todos los conflictos con su recomendación individual,
+        # sin resumen global por archivo.
+        conflicts_report.append(f"------------------------------------------------")
         conflicts_report.append(f"\n📂 Archivo: {file}")
-        if conflictos_en_archivo == 1:
-            if resumen_acciones == {"incoming"}:
-                conflicts_report.append(f"{Fore.BLUE}✅ Todos los conflictos pueden resolverse aceptando Incoming (PR).{Style.RESET_ALL}\n")
-            elif resumen_acciones == {"current"}:
-                conflicts_report.append(f"{Fore.BLUE}✅ Todos los conflictos pueden resolverse manteniendo Current (rama actual).{Style.RESET_ALL}\n")
-            elif resumen_acciones.issubset({"incoming", "current", "igual"}):
-                conflicts_report.append(f"{Fore.BLUE}✅ Todos los conflictos pueden resolverse automáticamente (Incoming o Current).{Style.RESET_ALL}\n")
-            else:
-                conflicts_report.extend(file_conflicts)
-        else:
-            conflicts_report.extend(file_conflicts)
+        conflicts_report.append(f"------------------------------------------------")
+        conflicts_report.extend(file_conflicts)
+
 
     path_out = os.path.join(REPO_PATH, "conflicts_resolution_guide.txt")
     with open(path_out, "w", encoding="utf-8") as f:
@@ -352,7 +353,7 @@ def aplicar_cherry_pick(repo, commit_id, pr_id):
             run_command("git cherry-pick --abort")
 
     input(f"PR actual: #{pr_id} {Fore.BLUE}🔹 Presiona ENTER para hacer commit y continuar con el siguiente cherry-pick...{Style.RESET_ALL}")
-    run_command("python 'C:\\Users\\aberdun\\Downloads\\rm\\PR\\verificar_cambios_cherry_pick.py'")
+    run_command("python C:\\Users\\aberdun\\Downloads\\rm\\PR\\verificar_cambios_cherry_pick.py", cwd=None)
 
     # Realizar el commit automático
     run_command("git commit --no-verify --no-edit")
