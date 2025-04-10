@@ -1,10 +1,5 @@
-
 import os
-import difflib
 from git import Repo
-from colorama import Fore, Style, init
-
-init(autoreset=True)
 
 REPO_PATH = "C:/Users/aberdun/Downloads/iberdrola-sfdx"
 ARCHIVO_DIFF_PR = os.path.join(REPO_PATH, "diff_pr_actual.txt")
@@ -15,7 +10,7 @@ def obtener_diff_actual_vs_head():
 
 def cargar_diff_pr():
     if not os.path.exists(ARCHIVO_DIFF_PR):
-        print(f"{Fore.RED}❌ No se encontró el archivo con el diff original: {ARCHIVO_DIFF_PR}{Style.RESET_ALL}")
+        print(f"[ERROR] No se encontró el archivo con el diff original: {ARCHIVO_DIFF_PR}")
         return []
     with open(ARCHIVO_DIFF_PR, "r", encoding="utf-8") as f:
         return f.readlines()
@@ -41,7 +36,7 @@ def analizar_cambios(diff_pr_lines, diff_actual):
     return faltan_por_añadir, faltan_por_eliminar
 
 def main():
-    print(f"{Fore.CYAN}🔍 Verificando que se hayan aplicado correctamente los cambios del cherry-pick...{Style.RESET_ALL}")
+    print("[INFO] Verificando que se hayan aplicado correctamente los cambios del cherry-pick...")
     diff_pr_lines = cargar_diff_pr()
     if not diff_pr_lines:
         return
@@ -50,18 +45,18 @@ def main():
     faltan_añadir, faltan_eliminar = analizar_cambios(diff_pr_lines, diff_actual)
 
     if not faltan_añadir and not faltan_eliminar:
-        print(f"{Fore.GREEN}✅ Todos los cambios de la PR se han aplicado correctamente en el cherry-pick.{Style.RESET_ALL}")
+        print("[OK] Todos los cambios de la PR se han aplicado correctamente en el cherry-pick.")
     else:
-        print(f"{Fore.YELLOW}⚠ Se detectaron diferencias entre el cherry-pick actual y el contenido esperado de la PR:{Style.RESET_ALL}")
+        print("[WARNING] Se detectaron diferencias entre el cherry-pick actual y el contenido esperado de la PR:")
         if faltan_añadir:
-            print(f"{Fore.RED}❌ Líneas que deberían haberse añadido pero no se encuentran:{Style.RESET_ALL}")
+            print("  - Líneas que deberían haberse añadido pero no se encuentran:")
             for linea in sorted(faltan_añadir):
-                print(f"   + {linea}")
+                print(f"    + {linea}")
         if faltan_eliminar:
-            print(f"{Fore.RED}❌ Líneas que deberían haberse eliminado pero siguen presentes:{Style.RESET_ALL}")
+            print("  - Líneas que deberían haberse eliminado pero siguen presentes:")
             for linea in sorted(faltan_eliminar):
-                print(f"   - {linea}")
-        print(f"{Fore.RED}🛑 Por favor, revisa estos cambios manualmente antes de hacer commit.{Style.RESET_ALL}")
+                print(f"    - {linea}")
+        print("[REVIEW] Por favor, revisa estos cambios manualmente antes de hacer commit.")
 
 if __name__ == "__main__":
     main()

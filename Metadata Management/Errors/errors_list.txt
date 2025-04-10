@@ -23,7 +23,9 @@ class: In field: apexClass - no ApexClass named IBERGO_FR_GetLogsStatusEdatalia_
 class: IBERGO_FR_GetLogsStatusEdatalia_REST
 class: In field: apexClass - no ApexClass named IBD_WorkOrderLockHelper found
 class: In field: apexClass - no ApexClass named GEN_Utility found
+class: In field: apexClass - no ApexClass named SOLAR_SitetrackerREST found
 class: GEN_Utility
+class: SOLAR_SitetrackerREST
 class: In field: apexClass - no ApexClass named HND_IBD_WorkOrderLock found
 flow_access: In field: flow - no FlowDefinition named IberGo_France_Flow_Decision found
 flow_access: In field: flow - no FlowDefinition named IBERGO_FR_ECatalog found
