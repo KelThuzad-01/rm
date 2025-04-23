@@ -415,6 +415,39 @@ def ejecutar_cherry_picks():
     print(f"\n{Fore.GREEN}🎯 Todos los cherry-picks han sido procesados.{Style.RESET_ALL}")
 
 
+def evaluar_lineas_adicionales_no_previstas(file_path, verdes_previstas, rojas_previstas, eval_report):
+    if not os.path.exists(file_path):
+        print(f"{Fore.RED}❌ Archivo no encontrado: {file_path}{Style.RESET_ALL}")
+        return
+
+    try:
+        with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+            contenido = f.read()
+            contenido = normalizar(contenido)
+    except Exception as e:
+        print(f"{Fore.RED}❌ Error leyendo {file_path}: {e}{Style.RESET_ALL}")
+        return
+
+    contenido_lineas = contenido.splitlines()
+
+    # Evaluar líneas inesperadas
+    verdes_norm = [normalizar(l.strip()) for l in verdes_previstas if l.strip()]
+    rojas_norm = [normalizar(l.strip()) for l in rojas_previstas if l.strip()]
+
+    extras = [
+        linea for linea in contenido_lineas
+        if linea.strip() and linea.strip() not in verdes_norm and linea.strip() not in rojas_norm
+    ]
+
+    if extras:
+        mensaje = f"[EVAL] En el archivo '{os.path.basename(file_path)}' se detectaron líneas añadidas no previstas:"
+        print(f"{Fore.YELLOW}{mensaje}{Style.RESET_ALL}")
+        eval_report.append(f"\n{mensaje}")
+        for l in extras:
+            print(f"{Fore.RED}  + {l}{Style.RESET_ALL}")
+            eval_report.append(f"  + {l}")
+
+
 def relanzar_evaluacion(diff_path):
     if not os.path.exists(diff_path):
         print(f"{Fore.RED}[ERROR] No se encontró el archivo con el diff original: {diff_path}{Style.RESET_ALL}")
@@ -437,6 +470,7 @@ def relanzar_evaluacion(diff_path):
         if line.startswith("diff --git"):
             if current_file and (verdes or rojas):
                 evaluar_cambios_pr_en_archivo(current_file, verdes, rojas, eval_report)
+                evaluar_lineas_adicionales_no_previstas(os.path.join(REPO_PATH, current_file), verdes, rojas, eval_report)
             partes = line.split(" b/")
             if len(partes) == 2:
                 current_file = partes[1].strip()
