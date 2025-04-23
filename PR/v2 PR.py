@@ -5,14 +5,16 @@ from urllib.parse import unquote
 from colorama import Fore, Style, init
 import codecs
 
+#pip install GitPython; pip install colorama; pip install chardet
+
 init(autoreset=True)  # Para usar colores en PowerShell
 
 # Ruta al repositorio donde se harán los cherry-picks
-REPO_PATH = "C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx"
+REPO_PATH = "C:\\Users\\Alejandro\\Downloads\\iberdrola-sfdx"  # ajusta si es necesario
+ARCHIVO_DIFF_PR = os.path.join(REPO_PATH, "diff_pr_actual.txt")
 
 # Lista de Pull Requests a aplicar (ordenada de menor a mayor)
-PULL_REQUESTS = sorted([])  # Reemplazar con PRs reales
-
+PULL_REQUESTS = sorted([10023, 10043, 9960, 9965, 9079, 9901])  # Reemplazar con PRs reales
 def run_command(command, cwd=REPO_PATH, ignore_errors=False, show_output=True):
     try:
         result = subprocess.run(command, shell=True, check=True, capture_output=True, text=True, cwd=cwd)
@@ -32,6 +34,7 @@ import unicodedata
 
 def normalizar(texto):
     return unicodedata.normalize("NFKD", texto).encode("ascii", "ignore").decode("ascii")
+
 
 def evaluar_cambios_pr_en_archivo(file, verdes, rojas, eval_report):
     file_path = os.path.join(REPO_PATH, file)
@@ -67,7 +70,7 @@ def evaluar_cambios_pr_en_archivo(file, verdes, rojas, eval_report):
             eval_report.append(f"  + {l}")
 
     if ya_estan:
-        mensaje = f"[EVAL] Ya están integradas estas líneas verdes:"
+        mensaje = f"[EVAL] En el archivo '{file}' ya están integradas estas líneas verdes:"
         print(f"{Fore.CYAN}{mensaje}{Style.RESET_ALL}")
         eval_report.append(f"\n{mensaje}")
         for l in ya_estan:
@@ -305,9 +308,6 @@ def analizar_conflictos(conflict_files):
                     conflicto.append(f"{Fore.CYAN}{mensaje}{Style.RESET_ALL}")
                     file_conflicts.extend(conflicto)
 
-                # 🧠 Evaluar siempre los cambios, aunque no se muestre el conflicto
-                evaluar_cambios_pr_en_archivo(file, verdes, rojas, conflicts_report)
-
                 conflicto = []
                 dentro_conflicto = False
                 leyendo_current = False
@@ -346,38 +346,46 @@ def analizar_conflictos(conflict_files):
 def aplicar_cherry_pick(repo, commit_id, pr_id):
     print(f"\n🔹 Aplicando cherry-pick de PR #{pr_id} (commit {commit_id})...")
 
-    # ⚠️ Guardar diff ANTES del cherry-pick
-    diff_path = os.path.join(REPO_PATH, "diff_pr_actual.txt")
-    try:
-        with open(diff_path, "w", encoding="utf-8") as f:
-            diff_pr = run_command(f"git show {commit_id} --pretty=format:'' --diff-filter=AM", show_output=False)
-            f.write(diff_pr or "")
-    except Exception as e:
-        print(f"{Fore.RED}❌ No se pudo guardar el diff de la PR: {e}{Style.RESET_ALL}")
-        return
-
     try:
         run_command(f"git cherry-pick -x --no-commit -m 1 {commit_id}")
-
         conflictos = identificar_conflictos()
+
         if conflictos:
             print(f"{Fore.YELLOW}⚠ Se detectaron conflictos en {len(conflictos)} archivo(s). Generando recomendaciones...{Style.RESET_ALL}")
             analizar_conflictos(conflictos)
 
-            # Bucle de evaluación tras resolver conflictos
             while True:
-                respuesta = input(f"{Fore.CYAN}¿Deseas volver a lanzar la evaluación de los cambios antes de hacer commit? (Y/N): {Style.RESET_ALL}").strip().upper()
+                respuesta = input(f"{Fore.CYAN}¿Deseas lanzar la evaluación de los cambios antes de hacer commit? (Y/N): {Style.RESET_ALL}").strip().upper()
                 if respuesta == "Y":
-                    analizar_conflictos(conflictos)
+                    # Guardar el diff real del index actual (cambios preparados para commit)
+                    diff_path = os.path.join(REPO_PATH, "diff_pr_actual.txt")
+                    diff_aplicado = run_command("git diff --cached --unified=0 --diff-filter=AM", show_output=False)
+                    with open(diff_path, "w", encoding="utf-8") as f:
+                        f.write(diff_aplicado or "")
+                    print(f"{Fore.BLUE}[EVAL] Lanzando evaluación inteligente...{Style.RESET_ALL}")
+                    relanzar_evaluacion(diff_path)
                 elif respuesta == "N":
                     break
                 else:
                     print(f"{Fore.YELLOW}Por favor, responde con 'Y' o 'N'.{Style.RESET_ALL}")
 
-        elif verificar_diferencias(commit_id):
-            print(f"{Fore.GREEN}✅ Cherry-pick de PR #{pr_id} aplicado correctamente.{Style.RESET_ALL}")
         else:
-            print(f"{Fore.RED}❌ PR #{pr_id} tiene diferencias inesperadas.{Style.RESET_ALL}")
+            print(f"{Fore.GREEN}✅ No se detectaron conflictos en esta PR. ¡Cherry-pick limpio!{Style.RESET_ALL}")
+            # También en PR limpias, generamos diff del commit aplicado
+            diff_path = os.path.join(REPO_PATH, "diff_pr_actual.txt")
+            diff_aplicado = run_command("git diff --cached --unified=0 --diff-filter=AM", show_output=False)
+            with open(diff_path, "w", encoding="utf-8") as f:
+                f.write(diff_aplicado or "")
+
+            while True:
+                respuesta = input(f"{Fore.CYAN}¿Deseas lanzar la evaluación de los cambios antes de hacer commit? (Y/N): {Style.RESET_ALL}").strip().upper()
+                if respuesta == "Y":
+                    print(f"{Fore.BLUE}[EVAL] Lanzando evaluación inteligente...{Style.RESET_ALL}")
+                    relanzar_evaluacion(diff_path)
+                elif respuesta == "N":
+                    break
+                else:
+                    print(f"{Fore.YELLOW}Por favor, responde con 'Y' o 'N'.{Style.RESET_ALL}")
 
     except Exception as e:
         print(f"{Fore.RED}❌ Error en cherry-pick de PR #{pr_id}: {e}{Style.RESET_ALL}")
@@ -387,6 +395,8 @@ def aplicar_cherry_pick(repo, commit_id, pr_id):
     input(f"PR actual: #{pr_id} {Fore.BLUE}🔹 Presiona ENTER para hacer commit y continuar con el siguiente cherry-pick...{Style.RESET_ALL}")
     run_command("git commit --no-verify --no-edit")
     run_command("git reset --hard")
+
+
 
 def ejecutar_cherry_picks():
     print(f"\n{Fore.CYAN}📥 Actualizando el repositorio...{Style.RESET_ALL}")
@@ -403,6 +413,54 @@ def ejecutar_cherry_picks():
             print(f"{Fore.YELLOW}⚠ Saltando PR #{pr_id} por falta de commit asociado.{Style.RESET_ALL}")
 
     print(f"\n{Fore.GREEN}🎯 Todos los cherry-picks han sido procesados.{Style.RESET_ALL}")
+
+
+def relanzar_evaluacion(diff_path):
+    if not os.path.exists(diff_path):
+        print(f"{Fore.RED}[ERROR] No se encontró el archivo con el diff original: {diff_path}{Style.RESET_ALL}")
+        return
+
+    with open(diff_path, "r", encoding="utf-8") as f:
+        diff = f.read()
+
+    if not diff.strip():
+        print(f"{Fore.YELLOW}[EVAL] El archivo diff_pr_actual.txt está vacío. No hay cambios que evaluar.{Style.RESET_ALL}")
+        return
+
+    print(f"{Fore.BLUE}[EVAL] Lanzando evaluación inteligente...{Style.RESET_ALL}")
+    eval_report = []
+    current_file = None
+    verdes = []
+    rojas = []
+
+    for line in diff.splitlines():
+        if line.startswith("diff --git"):
+            if current_file and (verdes or rojas):
+                evaluar_cambios_pr_en_archivo(current_file, verdes, rojas, eval_report)
+            partes = line.split(" b/")
+            if len(partes) == 2:
+                current_file = partes[1].strip()
+                verdes = []
+                rojas = []
+        elif line.startswith("+") and not line.startswith("+++"):
+            verdes.append(line[1:])
+        elif line.startswith("-") and not line.startswith("---"):
+            rojas.append(line[1:])
+
+    if current_file and (verdes or rojas):
+        evaluar_cambios_pr_en_archivo(current_file, verdes, rojas, eval_report)
+
+    print(f"\n{Fore.GREEN}📄 Evaluación completa. Se revisaron todos los cambios previstos en la PR.{Style.RESET_ALL}")
+
+    if eval_report:
+        print("\n".join(eval_report))
+        # 💾 Guardar resultados en conflicts_resolution_guide.txt
+        with open(os.path.join(REPO_PATH, "conflicts_resolution_guide.txt"), "a", encoding="utf-8") as f:
+            f.write("\n".join(eval_report))
+            f.write("\n\n" + "-" * 120 + "\n\n")
+    else:
+        print(f"{Fore.YELLOW}[EVAL] No se detectaron líneas relevantes para evaluar en esta PR.{Style.RESET_ALL}")
+
 
 
 ejecutar_cherry_picks()
