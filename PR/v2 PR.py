@@ -13,8 +13,10 @@ init(autoreset=True)  # Para usar colores en PowerShell
 REPO_PATH = "C:\\Users\\Alejandro\\Downloads\\iberdrola-sfdx"  # ajusta si es necesario
 ARCHIVO_DIFF_PR = os.path.join(REPO_PATH, "diff_pr_actual.txt")
 
+
+
 # Lista de Pull Requests a aplicar (ordenada de menor a mayor)
-PULL_REQUESTS = sorted([10023, 10043, 9960, 9965, 9079, 9901])  # Reemplazar con PRs reales
+PULL_REQUESTS = sorted([10387])  # Reemplazar con PRs reales
 def run_command(command, cwd=REPO_PATH, ignore_errors=False, show_output=True):
     try:
         result = subprocess.run(command, shell=True, check=True, capture_output=True, text=True, cwd=cwd)
@@ -36,48 +38,21 @@ def normalizar(texto):
     return unicodedata.normalize("NFKD", texto).encode("ascii", "ignore").decode("ascii")
 
 
-def evaluar_cambios_pr_en_archivo(file, verdes, rojas, eval_report):
-    file_path = os.path.join(REPO_PATH, file)
-    if not os.path.exists(file_path):
-        return
-
-    try:
-        with open(file_path, "r", encoding="utf-8", errors="replace") as f:
-            contenido = f.read()
-            contenido = normalizar(contenido)
-    except Exception as e:
-        print(f"{Fore.RED}❌ Error al leer el archivo {file_path}: {e}{Style.RESET_ALL}")
-        return
-
-    faltan_añadir = [l for l in verdes if l.strip() and normalizar(l.strip()) not in contenido]
-    faltan_eliminar = [l for l in rojas if l.strip() and normalizar(l.strip()) in contenido]
-    ya_estan = [l for l in verdes if l.strip() and normalizar(l.strip()) in contenido]
-
-    if faltan_eliminar:
-        mensaje = f"[EVAL] En el archivo '{file}' aún hay líneas que debían eliminarse:"
-        print(f"{Fore.YELLOW}{mensaje}{Style.RESET_ALL}")
-        eval_report.append(f"\n{mensaje}")
-        for l in faltan_eliminar:
-            print(f"{Fore.RED}  - {l}{Style.RESET_ALL}")
-            eval_report.append(f"  - {l}")
-
-    if faltan_añadir:
-        mensaje = f"[EVAL] En el archivo '{file}' faltan líneas verdes que no se han añadido:"
-        print(f"{Fore.YELLOW}{mensaje}{Style.RESET_ALL}")
-        eval_report.append(f"\n{mensaje}")
-        for l in faltan_añadir:
-            print(f"{Fore.GREEN}  + {l}{Style.RESET_ALL}")
-            eval_report.append(f"  + {l}")
-
-    if ya_estan:
-        mensaje = f"[EVAL] En el archivo '{file}' ya están integradas estas líneas verdes:"
-        print(f"{Fore.CYAN}{mensaje}{Style.RESET_ALL}")
-        eval_report.append(f"\n{mensaje}")
-        for l in ya_estan:
-            print(f"{Fore.CYAN}  ✓ {l}{Style.RESET_ALL}")
-            eval_report.append(f"  ✓ {l}")
-
-
+def analizar_diff_por_archivo(diff_text):
+    archivos = {}
+    current_file = None
+    for line in diff_text.splitlines():
+        if line.startswith("diff --git"):
+            partes = line.split(" b/")
+            if len(partes) == 2:
+                current_file = partes[1].strip()
+                archivos[current_file] = {"verdes": [], "rojas": []}
+        elif current_file:
+            if line.startswith("+") and not line.startswith("+++"):
+                archivos[current_file]["verdes"].append(line[1:])
+            elif line.startswith("-") and not line.startswith("---"):
+                archivos[current_file]["rojas"].append(line[1:])
+    return archivos
 
 def obtener_commit_de_pr(pr_id):
     command = f'git log --all --grep="#{pr_id}" --format="%H"'
@@ -355,7 +330,7 @@ def aplicar_cherry_pick(repo, commit_id, pr_id):
             analizar_conflictos(conflictos)
 
             while True:
-                respuesta = input(f"{Fore.CYAN}¿Deseas lanzar la evaluación de los cambios antes de hacer commit? (Y/N): {Style.RESET_ALL}").strip().upper()
+                respuesta = input(f"PR actual: #{pr_id}{Fore.CYAN}¿Deseas lanzar la evaluación de los cambios antes de hacer commit? (Y/N): {Style.RESET_ALL}").strip().upper()
                 if respuesta == "Y":
                     # Guardar el diff real del index actual (cambios preparados para commit)
                     diff_path = os.path.join(REPO_PATH, "diff_pr_actual.txt")
@@ -363,7 +338,7 @@ def aplicar_cherry_pick(repo, commit_id, pr_id):
                     with open(diff_path, "w", encoding="utf-8") as f:
                         f.write(diff_aplicado or "")
                     print(f"{Fore.BLUE}[EVAL] Lanzando evaluación inteligente...{Style.RESET_ALL}")
-                    relanzar_evaluacion(diff_path)
+                    evaluar_diferencias_locales(diff_path)
                 elif respuesta == "N":
                     break
                 else:
@@ -378,10 +353,10 @@ def aplicar_cherry_pick(repo, commit_id, pr_id):
                 f.write(diff_aplicado or "")
 
             while True:
-                respuesta = input(f"{Fore.CYAN}¿Deseas lanzar la evaluación de los cambios antes de hacer commit? (Y/N): {Style.RESET_ALL}").strip().upper()
+                respuesta = input(f"PR actual: #{pr_id}{Fore.CYAN}¿Deseas lanzar la evaluación de los cambios antes de hacer commit? (Y/N): {Style.RESET_ALL}").strip().upper()
                 if respuesta == "Y":
                     print(f"{Fore.BLUE}[EVAL] Lanzando evaluación inteligente...{Style.RESET_ALL}")
-                    relanzar_evaluacion(diff_path)
+                    evaluar_diferencias_locales(diff_path)
                 elif respuesta == "N":
                     break
                 else:
@@ -448,53 +423,79 @@ def evaluar_lineas_adicionales_no_previstas(file_path, verdes_previstas, rojas_p
             eval_report.append(f"  + {l}")
 
 
-def relanzar_evaluacion(diff_path):
+def evaluar_diferencias_locales(diff_path):
     if not os.path.exists(diff_path):
         print(f"{Fore.RED}[ERROR] No se encontró el archivo con el diff original: {diff_path}{Style.RESET_ALL}")
         return
 
     with open(diff_path, "r", encoding="utf-8") as f:
-        diff = f.read()
+        diff_pr = f.read()
 
-    if not diff.strip():
+    if not diff_pr.strip():
         print(f"{Fore.YELLOW}[EVAL] El archivo diff_pr_actual.txt está vacío. No hay cambios que evaluar.{Style.RESET_ALL}")
         return
 
     print(f"{Fore.BLUE}[EVAL] Lanzando evaluación inteligente...{Style.RESET_ALL}")
-    eval_report = []
-    current_file = None
-    verdes = []
-    rojas = []
 
-    for line in diff.splitlines():
-        if line.startswith("diff --git"):
-            if current_file and (verdes or rojas):
-                evaluar_cambios_pr_en_archivo(current_file, verdes, rojas, eval_report)
-                evaluar_lineas_adicionales_no_previstas(os.path.join(REPO_PATH, current_file), verdes, rojas, eval_report)
-            partes = line.split(" b/")
-            if len(partes) == 2:
-                current_file = partes[1].strip()
-                verdes = []
-                rojas = []
-        elif line.startswith("+") and not line.startswith("+++"):
-            verdes.append(line[1:])
-        elif line.startswith("-") and not line.startswith("---"):
-            rojas.append(line[1:])
+    staged_diff = run_command("git diff --cached --unified=0 --diff-filter=AM", show_output=False)
+    if not staged_diff:
+        print(f"{Fore.YELLOW}[EVAL] No hay cambios staged para evaluar.{Style.RESET_ALL}")
+        return
 
-    if current_file and (verdes or rojas):
-        evaluar_cambios_pr_en_archivo(current_file, verdes, rojas, eval_report)
+    def extraer_lineas_por_archivo(diff_text):
+        cambios = {}
+        archivo_actual = None
+        for line in diff_text.splitlines():
+            if line.startswith("diff --git"):
+                partes = line.split(" b/")
+                if len(partes) == 2:
+                    archivo_actual = partes[1].strip()
+                    cambios[archivo_actual] = {"verdes": [], "rojas": []}
+            elif archivo_actual:
+                if line.startswith("+") and not line.startswith("+++") and line[1:].strip():
+                    cambios[archivo_actual]["verdes"].append(line[1:].strip())
+                elif line.startswith("-") and not line.startswith("---") and line[1:].strip():
+                    cambios[archivo_actual]["rojas"].append(line[1:].strip())
+        return cambios
 
-    print(f"\n{Fore.GREEN}📄 Evaluación completa. Se revisaron todos los cambios previstos en la PR.{Style.RESET_ALL}")
+    cambios_pr = extraer_lineas_por_archivo(diff_pr)
+    cambios_locales = extraer_lineas_por_archivo(staged_diff)
 
-    if eval_report:
-        print("\n".join(eval_report))
-        # 💾 Guardar resultados en conflicts_resolution_guide.txt
-        with open(os.path.join(REPO_PATH, "conflicts_resolution_guide.txt"), "a", encoding="utf-8") as f:
-            f.write("\n".join(eval_report))
-            f.write("\n\n" + "-" * 120 + "\n\n")
-    else:
-        print(f"{Fore.YELLOW}[EVAL] No se detectaron líneas relevantes para evaluar en esta PR.{Style.RESET_ALL}")
+    for archivo, cambios in cambios_pr.items():
+        verdes_pr = set(cambios["verdes"])
+        rojas_pr = set(cambios["rojas"])
 
+        verdes_loc = set(cambios_locales.get(archivo, {}).get("verdes", []))
+        rojas_loc = set(cambios_locales.get(archivo, {}).get("rojas", []))
+
+        faltan_verdes = verdes_pr - verdes_loc
+        faltan_rojas = rojas_pr - rojas_loc
+        extras_verdes = verdes_loc - verdes_pr
+        extras_rojas = rojas_loc - rojas_pr
+
+        if not faltan_verdes and not faltan_rojas and not extras_verdes and not extras_rojas:
+            continue  # Todo coincide, no mostramos nada
+
+        print(f"\n📁 Evaluando archivo: {archivo}")
+
+        if faltan_verdes:
+            print(f"{Fore.YELLOW}[EVAL] Faltan líneas verdes (no añadidas):{Style.RESET_ALL}")
+            for l in faltan_verdes:
+                print(f"{Fore.YELLOW}  + {l}{Style.RESET_ALL}")
+        if faltan_rojas:
+            print(f"{Fore.YELLOW}[EVAL] Faltan líneas rojas (no eliminadas):{Style.RESET_ALL}")
+            for l in faltan_rojas:
+                print(f"{Fore.YELLOW}  - {l}{Style.RESET_ALL}")
+        if extras_verdes:
+            print(f"{Fore.RED}[EVAL] Se han añadido líneas no previstas por la PR:{Style.RESET_ALL}")
+            for l in extras_verdes:
+                print(f"{Fore.RED}  + {l}{Style.RESET_ALL}")
+        if extras_rojas:
+            print(f"{Fore.RED}[EVAL] Se han eliminado líneas no previstas por la PR:{Style.RESET_ALL}")
+            for l in extras_rojas:
+                print(f"{Fore.RED}  - {l}{Style.RESET_ALL}")
+
+    print(f"\n{Fore.GREEN}📄 Evaluación completa. Se revisaron todos los cambios staged no commiteados.{Style.RESET_ALL}")
 
 
 ejecutar_cherry_picks()
