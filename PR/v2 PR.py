@@ -11,7 +11,7 @@ init(autoreset=True)
 REPO_PATH = "C:\\Users\\Alejandro\\Downloads\\iberdrola-sfdx"  # ajustar
 
 # Lista de Pull Requests a aplicar
-PULL_REQUESTS = sorted([9698, 9775, 10133, 10274, 10382, 10467, 10525, 10602])
+PULL_REQUESTS = sorted([10620, 10613, 10547, 10572, 10432, 10576])
 import subprocess
 
 def run_command(command, cwd=REPO_PATH, ignore_errors=False, show_output=True, suppress_output=False):
@@ -96,20 +96,50 @@ def limpiar_conflictos_both(content):
             i += 1
     return "".join(new_lines)
 
+def combinar_conflictos_both(file_path):
+    with open(file_path, 'r', encoding='utf-8') as f:
+        lines = f.readlines()
+
+    resultado = []
+    i = 0
+    while i < len(lines):
+        if lines[i].startswith('<<<<<<<'):
+            current = []
+            incoming = []
+            i += 1
+            while i < len(lines) and not lines[i].startswith('======='):
+                current.append(lines[i])
+                i += 1
+            i += 1  # saltar =======
+            while i < len(lines) and not lines[i].startswith('>>>>>>>'):
+                incoming.append(lines[i])
+                i += 1
+            i += 1  # saltar >>>>>>>
+            resultado.extend(current + incoming)
+        else:
+            resultado.append(lines[i])
+            i += 1
+
+    with open(file_path, 'w', encoding='utf-8', newline='\n') as f:
+        f.writelines(resultado)
 
 def resolver_conflictos_list_usando_mergefile():
     conflicted_files = run_command("git diff --name-only --diff-filter=U").splitlines()
+
+    archivos_current = ()
+    archivos_incoming = (
+        ".validationRule-meta.xml",
+        ".md-meta.xml",
+        ".flow-meta.xml",
+        ".field-meta.xml",
+    )
+
     for file_path in conflicted_files:
-        
-        import urllib.parse
-
-        if file_path.endswith(".profile-meta.xml") or file_path.endswith(".permissionset-meta.xml") or file_path.endswith(".app-meta.xml"):
+        if file_path.endswith(archivos_current):
             try:
-                quoted_path = f":2:{file_path}".replace("\\", "/").replace('"', r'\"')
-                current_content = run_command(f'git show "{quoted_path}"')
-
-                if current_content is None:
-                    raise ValueError("No se pudo obtener el contenido de current")
+                current_content = git_show_stage(2, file_path)
+                if not current_content:
+                    raise ValueError("Contenido current vacío o inexistente")
 
                 with open(file_path, 'w', encoding='utf-8', newline='\n') as f:
                     f.write(current_content)
@@ -120,81 +150,33 @@ def resolver_conflictos_list_usando_mergefile():
                 print(f"❌ Error al resolver {file_path} con current: {e}")
             continue
 
-
-        if file_path.endswith(".validationRule-meta.xml"):
-            try:
-                incoming_content = run_command_binary(f"git show :3:{file_path}")
-                with open(file_path, 'wb') as f:
-                    f.write(incoming_content)
-                run_command(f'git add "{file_path}"')
-                print(f"\033[94m✅ Resuelto con incoming: {file_path}\033[0m")
-            except Exception as e:
-                print(f"❌ Error al resolver {file_path} con incoming: {e}")
-            continue
-
-        if file_path.endswith(".md-meta.xml") and "force" in file_path:
-            try:
-                incoming_content = run_command_binary(f"git show :3:{file_path}")
-                with open(file_path, 'wb') as f:
-                    f.write(incoming_content)
-                run_command(f'git add "{file_path}"')
-                print(f"\033[94m✅ Resuelto con incoming: {file_path}\033[0m")
-            except Exception as e:
-                print(f"❌ Error al resolver {file_path} con incoming: {e}")
-            continue
-
-        if file_path.endswith(".flow-meta.xml"):
-            try:
-                incoming_content = run_command_binary(f"git show :3:{file_path}")
-                with open(file_path, 'wb') as f:
-                    f.write(incoming_content)
-                run_command(f'git add "{file_path}"')
-                print(f"\033[94m✅ Resuelto con incoming: {file_path}\033[0m")
-
-            except Exception as e:
-                print(f"❌ Error al resolver {file_path} con incoming: {e}")
-            continue
-        
-        if file_path.endswith(".field-meta.xml"):
-            try:
-                incoming_content = run_command_binary(f"git show :3:{file_path}")
-                with open(file_path, 'wb') as f:
-                    f.write(incoming_content)
-                run_command(f'git add "{file_path}"')
-                print(f"\033[94m✅ Resuelto con incoming: {file_path}\033[0m")
-
-            except Exception as e:
-                print(f"❌ Error al resolver {file_path} con incoming: {e}")
-            continue
-
-        if not (
-            file_path.endswith(".list") or 
-            file_path.endswith(".globalValueSet-meta.xml") or 
-            file_path.endswith(".flexipage-meta.xml") or
-            file_path.endswith(".asset-meta.xml") or
-            file_path.endswith(".layout-meta.xml") or
-            file_path.endswith(".listView-meta.xml") or
-            file_path.endswith(".businessProcess-meta.xml") or
-            file_path.endswith(".compactLayout-meta.xml") or
-            file_path.endswith(".audience-meta.xml") or
-            file_path.endswith(".translation-meta.xml") or
-            file_path.endswith(".recordType-meta.xml")
+        if file_path.endswith(archivos_incoming) or (
+            file_path.endswith(".md-meta.xml") and "force" in file_path
         ):
+            try:
+                incoming_content = run_command_binary(f"git show :3:{file_path}")
+                with open(file_path, 'wb') as f:
+                    f.write(incoming_content)
+
+                run_command(f'git add "{file_path}"')
+                print(f"\033[94m✅ Resuelto con incoming: {file_path}\033[0m")
+            except Exception as e:
+                print(f"❌ Error al resolver {file_path} con incoming: {e}")
             continue
 
-        
+        # DEFAULT: Accept Both
         base_path = f"{file_path}.base"
         current_path = f"{file_path}.current"
         incoming_path = f"{file_path}.incoming"
-        
+
         try:
             try:
-                base_content = run_command(f"git show :1:{file_path}", ignore_errors=True)
+                base_content = git_show_stage(1, file_path)
             except Exception:
-                base_content = ''  # ⚠️ Si no existe en stage 1, asumimos vacío
+                base_content = ""
 
             with open(base_path, 'w', encoding='utf-8') as f:
-                f.write(git_show_stage(1, file_path))
+                f.write(base_content)
 
             with open(current_path, 'w', encoding='utf-8') as f:
                 f.write(git_show_stage(2, file_path))
@@ -202,31 +184,32 @@ def resolver_conflictos_list_usando_mergefile():
             with open(incoming_path, 'w', encoding='utf-8') as f:
                 f.write(git_show_stage(3, file_path))
 
-
             merged_content = run_command(
                 f'git merge-file -p "{current_path}" "{base_path}" "{incoming_path}"',
                 ignore_errors=True
             )
 
-
             if any(marker in merged_content for marker in ("<<<<<<<", "=======", ">>>>>>>")):
                 merged_content = limpiar_conflictos_both(merged_content)
 
             if any(marker in merged_content for marker in ("<<<<<<<", "=======", ">>>>>>>")):
-                print(f"🛑 {file_path} aún tiene conflictos complejos. Revisión manual necesaria.")
-                continue
-
-            with open(file_path, 'w', encoding='utf-8', newline='\n') as f:
-                f.write(merged_content)
+                print(f"⚠️ Conflicto no resuelto por merge-file en {file_path}, aplicando combinación línea a línea estilo VS Code...")
+                combinar_conflictos_both(file_path)
+            else:
+                with open(file_path, 'w', encoding='utf-8', newline='\n') as f:
+                    f.write(merged_content)
 
             run_command(f'git add "{file_path}"')
             print(f"\033[92m✅ Resuelto como Accept Both: {file_path}\033[0m")
+
         except Exception as e:
             print(f"❌ Error al resolver {file_path}: {e}")
         finally:
             for temp in [base_path, current_path, incoming_path]:
                 if os.path.exists(temp):
                     os.remove(temp)
+
+
 
 def aplicar_cherry_pick(repo, commit_id, pr_id):
     print(f"\n🔹 Aplicando cherry-pick de PR #{pr_id} (commit {commit_id})...")
