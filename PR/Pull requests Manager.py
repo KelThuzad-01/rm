@@ -1,3 +1,7 @@
+#1 - ajustar rutas de archivos
+#2- invocar python desde la carpeta del proyecto con python
+#3- ajustar órden SF para atacar entorno correcto 
+
 import os
 import subprocess
 import webbrowser
@@ -13,12 +17,12 @@ setDelta = False
 PULL_REQUESTS = [
 ]  # Lista de IDs de las Pull Requests.
 
-REPO_PATH = "C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx"
+REPO_PATH = "C:\\Users\\Alejandro\\Downloads\\ibd\\iberdrola-sfdx"  # ajustar
 #git clone --branch release/UAT2_20250317 --single-branch https://alejandroberdun1@bitbucket.org/iberdrola-clientes/iberdrola-sfdx.git; git remote set-branches origin '*';git fetch --all
-#REPO_PATH = "C:\\Users\\aberdun\\Downloads\\uat2\\iberdrola-sfdx"
-profile_path = "C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx\\force-app\\main\\default\\profiles"
-permission_set_path = "C:\\Users\\aberdun\\Downloads\\iberdrola-sfdx\\force-app\\main\\default\\permissionsets"
-errors_log_path = r'C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\errors_list.txt'
+#REPO_PATH = "C:\\Users\\Alejandro\\Downloads\\uat2\\iberdrola-sfdx"
+profile_path = "C:\\Users\\Alejandro\\Downloads\\ibd\\iberdrola-sfdx\\force-app\\main\\default\\profiles"
+permission_set_path = "C:\\Users\\Alejandro\\Downloads\\ibd\\iberdrola-sfdx\\force-app\\main\\default\\permissionsets"
+errors_log_path = r'C:\\Users\\Alejandro\\Downloads\\rm\\Metadata Management\\Errors\\errors_list.txt'
 
 EXCLUDE_LINES = [
     "<default>false</default>", "<default>true</default>", "+++ b/", "--- a/", "force-app/main/default",
@@ -37,20 +41,20 @@ EXCLUDE_LINES = [
 ]
 
 delete_script_templates = {
-    'field_specific': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deleteFieldSpecificPermissions.mjs" "{profile_path}" "{object_name}" "{field_name}"',
-    'record_type': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deletePermissionSetProfileRecordTypepermissionsReferences.mjs" "{profile_path}" "{record_type_name}"',
-    'object': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deletePermissionSetProfileObjectpermissionsReferences.mjs" "{profile_path}" "{object_name}"',
-    'class': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deletePermissionSetProfileClasspermissionsReferencesByObjectOrField.mjs" "{profile_path}" "{class_name}"',
-    'apex_page': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deletePermissionSetProfileApexPagepermissionsReferencesByObjectOrField.mjs" "{profile_path}" "{apex_page_name}"',
-    'flow_access': r'node "C:\\Users\\aberdun\Downloads\\rm\\Metadata Management\\Errors\deleteProfileFlowaccessesReferencesByFlow.mjs" "{profile_path}" "{flow_access_name}',
-    'layout': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deletePermissionSetProfileLayoutAssignmentsReferences.mjs" "{profile_path}" "{layout_name}"',
-    'tab_visibility': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deletePermissionSetProfileTabVisibilitiesReferences.mjs" "{profile_path}" "{tab_name}"',
-    'custom_metadata_access': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deleteCustomMetadataAccesses.mjs" "{profile_path}" "{metadata_name}"',
-    'custom_permission': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deleteCustomPermissions.mjs" "{profile_path}" "{custom_permission_name}"',
-    'user_permission': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deleteUserPermissions.mjs" "{profile_path}" "{user_permission_name}"',
-    'mdt_fields': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deleteMDTFieldPermissions.mjs" "{profile_path}" "{object_name}"',
-    'mdt_layouts': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\deleteMDTLayoutAssignments.mjs" "{profile_path}" "{object_name}"',
-    'fix_field_permissions': r'node "C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\fixFieldPermissions.mjs" "{profile_path}"'
+    'field_specific': r'node "C:\\Users\\Alejandro\\Downloads\\rm\\Metadata Management\\Errors\\deleteFieldSpecificPermissions.mjs" "{profile_path}" "{object_name}" "{field_name}"',
+    'record_type': r'node "C:\\Users\\Alejandro\\Downloads\\rm\\Metadata Management\\Errors\\deletePermissionSetProfileRecordTypepermissionsReferences.mjs" "{profile_path}" "{record_type_name}"',
+    'object': r'node "C:\\Users\\Alejandro\\Downloads\\rm\\Metadata Management\\Errors\\deletePermissionSetProfileObjectpermissionsReferences.mjs" "{profile_path}" "{object_name}"',
+    'class': r'node "C:\\Users\\Alejandro\\Downloads\\rm\\Metadata Management\\Errors\\deletePermissionSetProfileClasspermissionsReferencesByObjectOrField.mjs" "{profile_path}" "{class_name}"',
+    'apex_page': r'node "C:\\Users\\Alejandro\\Downloads\\rm\\Metadata Management\\Errors\\deletePermissionSetProfileApexPagepermissionsReferencesByObjectOrField.mjs" "{profile_path}" "{apex_page_name}"',
+    'flow_access': r'node "C:\\Users\\Alejandro\Downloads\\rm\\Metadata Management\\Errors\deleteProfileFlowaccessesReferencesByFlow.mjs" "{profile_path}" "{flow_access_name}',
+    'layout': r'node "C:\\Users\\Alejandro\\Downloads\\rm\\Metadata Management\\Errors\\deletePermissionSetProfileLayoutAssignmentsReferences.mjs" "{profile_path}" "{layout_name}"',
+    'tab_visibility': r'node "C:\\Users\\Alejandro\\Downloads\\rm\\Metadata Management\\Errors\\deletePermissionSetProfileTabVisibilitiesReferences.mjs" "{profile_path}" "{tab_name}"',
+    'custom_metadata_access': r'node "C:\\Users\\Alejandro\\Downloads\\rm\\Metadata Management\\Errors\\deleteCustomMetadataAccesses.mjs" "{profile_path}" "{metadata_name}"',
+    'custom_permission': r'node "C:\\Users\\Alejandro\\Downloads\\rm\\Metadata Management\\Errors\\deleteCustomPermissions.mjs" "{profile_path}" "{custom_permission_name}"',
+    'user_permission': r'node "C:\\Users\\Alejandro\\Downloads\\rm\\Metadata Management\\Errors\\deleteUserPermissions.mjs" "{profile_path}" "{user_permission_name}"',
+    'mdt_fields': r'node "C:\\Users\\Alejandro\\Downloads\\rm\\Metadata Management\\Errors\\deleteMDTFieldPermissions.mjs" "{profile_path}" "{object_name}"',
+    'mdt_layouts': r'node "C:\\Users\\Alejandro\\Downloads\\rm\\Metadata Management\\Errors\\deleteMDTLayoutAssignments.mjs" "{profile_path}" "{object_name}"',
+    'fix_field_permissions': r'node "C:\\Users\\Alejandro\\Downloads\\rm\\Metadata Management\\Errors\\fixFieldPermissions.mjs" "{profile_path}"'
 }
 
 error_patterns = {
@@ -494,95 +498,10 @@ def resolver_conflictos_tests_to_run(archivo):
 def normalize_text(text):
     return unicodedata.normalize("NFC", text)
 
-def process_deploymentQA():
-    deploy_command = "sf project deploy start --target-org QA-IBD --manifest deploy-manifest/package/package.xml --post-destructive-changes deploy-manifest/destructiveChanges/destructiveChanges.xml --dry-run --wait 240 --ignore-warnings --concise --ignore-conflicts"
-    fields_found = True
-    deployment_attempts = 0
-
-    # Cargar errores previos una sola vez
-    previous_errors_output = load_previous_errors(errors_log_path)
-    errors_processed = False  # Asegura que los errores previos solo se usen una vez
-
-    while fields_found:
-        deployment_attempts += 1
-        print(f'Starting deployment... (Attempt {deployment_attempts})')
-
-        if not errors_processed and previous_errors_output:
-            print("⚠ Se encontraron errores previos, reutilizando...")
-            if isinstance(previous_errors_output, str):
-                previous_errors_output = extract_errors(previous_errors_output)  # Convertimos a diccionario si es string
-            errors = previous_errors_output or {}  # Si es None, inicializamos vacío
-            errors_processed = True  # Evita reutilizar errores más de una vez
-        else:
-            output = run_command(deploy_command)
-            print('🔹 Deployment output:', output)
-
-            extracted_errors = extract_errors(output) or {}  # Aseguramos que no sea None
-            print('🔹 Extracted errors:', extracted_errors)
-
-            # 🔹 Unimos errores previos y nuevos para asegurarnos de no perder ninguno
-            errors = {}
-
-            for key in error_patterns.keys():
-                prev_errors = previous_errors_output.get(key, set()) if isinstance(previous_errors_output, dict) else set()
-                new_errors = extracted_errors.get(key, set())
-
-                cleaned_errors = set()
-                for error in new_errors:
-                    match = re.search(error_patterns[key], error)
-                    if match:
-                        if key == 'field_specific':
-                            cleaned_errors.add((match.group(1), match.group(2)))
-                        else:
-                            cleaned_errors.add(match.group(1))
-
-                errors[key] = prev_errors.union(cleaned_errors)
-
-
-            save_errors_to_file(errors, errors_log_path)  # Guardamos los errores combinados
-            print('✅ Errores final combinados:', errors)  # Confirmación de los errores que se están guardando
-
-        action_taken = False
-
-        for key, items in errors.items():
-            for item in items:
-                print(f'Extracted {key}:', item)
-
-                for path in [profile_path, permission_set_path]:
-                    if key == 'field_specific':
-                        object_name, field_name = item
-                        delete_script = delete_script_templates['field_specific'].format(profile_path=path, object_name=object_name, field_name=field_name)
-                    elif key == 'object' and item.endswith('__mdt'):
-                        delete_script_fields = delete_script_templates['mdt_fields'].format(profile_path=path, object_name=item)
-                        delete_script_layouts = delete_script_templates['mdt_layouts'].format(profile_path=path, object_name=item)
-                        run_command(delete_script_fields)  # Ejecutamos después de definir ambos
-                        run_command(delete_script_layouts)
-                        continue  # Saltamos el resto para este caso
-                    elif key == 'custom_metadata_access':
-                        delete_script = delete_script_templates[key].format(profile_path=path, metadata_name=item)
-                    elif key == 'tab_visibility':  
-                        delete_script = delete_script_templates[key].format(profile_path=path, tab_name=item)
-                    elif key == 'fix_field_permissions':
-                        delete_script = delete_script_templates[key].format(profile_path=path)
-                    else:
-                        delete_script = delete_script_templates[key].format(profile_path=path, **{f'{key}_name': item})
-
-                    print(f'Running delete script for {key} at {path}...')
-                    delete_output = run_command(delete_script)
-                    print('Delete script output:', delete_output)
-
-                action_taken = True
-
-        if not action_taken:
-            print('No further action required.')
-            print('\a')  # Beep sound
-            fields_found = False
-
-
         
 def process_deploymentPROD():
     
-    deploy_command = "sf project deploy start --target-org IBD-prod --manifest deploy-manifest/package/package.xml --post-destructive-changes deploy-manifest/destructiveChanges/destructiveChanges.xml --dry-run --wait 240 --ignore-warnings --concise --ignore-conflicts"
+    deploy_command = "sf project deploy start --target-org mobility --manifest deploy-manifest/package/package.xml --post-destructive-changes deploy-manifest/destructiveChanges/destructiveChanges.xml --dry-run --wait 240 --ignore-warnings --concise --ignore-conflicts"
 
     fields_found = True
     deployment_attempts = 0
@@ -595,40 +514,33 @@ def process_deploymentPROD():
         deployment_attempts += 1
         print(f'Starting deployment... (Attempt {deployment_attempts})')
 
-        if not errors_processed and previous_errors_output:
-            print("⚠ Se encontraron errores previos, reutilizando...")
-            if isinstance(previous_errors_output, str):
-                previous_errors_output = extract_errors(previous_errors_output)  # Convertimos a diccionario si es string
-            errors = previous_errors_output or {}  # Si es None, inicializamos vacío
-            errors_processed = True  # Evita reutilizar errores más de una vez
-        else:
-            output = run_command(deploy_command)
-            print('🔹 Deployment output:', output)
+        output = run_command(deploy_command)
+        print('🔹 Deployment output:', output)
 
-            extracted_errors = extract_errors(output) or {}  # Aseguramos que no sea None
-            print('🔹 Extracted errors:', extracted_errors)
+        extracted_errors = extract_errors(output) or {}  # Aseguramos que no sea None
+        print('🔹 Extracted errors:', extracted_errors)
 
-            # 🔹 Unimos errores previos y nuevos para asegurarnos de no perder ninguno
-            errors = {}
+        # 🔹 Unimos errores previos y nuevos para asegurarnos de no perder ninguno
+        errors = {}
 
-            for key in error_patterns.keys():
-                prev_errors = previous_errors_output.get(key, set()) if isinstance(previous_errors_output, dict) else set()
-                new_errors = extracted_errors.get(key, set())
+        for key in error_patterns.keys():
+            prev_errors = previous_errors_output.get(key, set()) if isinstance(previous_errors_output, dict) else set()
+            new_errors = extracted_errors.get(key, set())
 
-                cleaned_errors = set()
-                for error in new_errors:
-                    match = re.search(error_patterns[key], error)
-                    if match:
-                        if key == 'field_specific':
-                            cleaned_errors.add((match.group(1), match.group(2)))
-                        else:
-                            cleaned_errors.add(match.group(1))
+            cleaned_errors = set()
+            for error in new_errors:
+                match = re.search(error_patterns[key], error)
+                if match:
+                    if key == 'field_specific':
+                        cleaned_errors.add((match.group(1), match.group(2)))
+                    else:
+                        cleaned_errors.add(match.group(1))
 
-                errors[key] = prev_errors.union(cleaned_errors)
+            errors[key] = prev_errors.union(cleaned_errors)
 
 
-            save_errors_to_file(errors, errors_log_path)  # Guardamos los errores combinados
-            print('✅ Errores final combinados:', errors)  # Confirmación de los errores que se están guardando
+        save_errors_to_file(errors, errors_log_path)  # Guardamos los errores combinados
+        print('✅ Errores final combinados:', errors)  # Confirmación de los errores que se están guardando
 
         action_taken = False
         for key, items in errors.items():
@@ -679,94 +591,9 @@ def process_deploymentPROD():
             fields_found = False
 
 
-def process_deploymentAnother():
-    deploy_command = "sf project deploy start --target-org mobility --manifest deploy-manifest/package/package.xml --post-destructive-changes deploy-manifest/destructiveChanges/destructiveChanges.xml --dry-run --wait 240 --ignore-warnings --concise --ignore-conflicts"
-    fields_found = True
-    deployment_attempts = 0
-
-    # Cargar errores previos una sola vez
-    previous_errors_output = load_previous_errors(errors_log_path)
-    errors_processed = False  # Asegura que los errores previos solo se usen una vez
-
-    while fields_found:
-        deployment_attempts += 1
-        print(f'Starting deployment... (Attempt {deployment_attempts})')
-
-        if not errors_processed and previous_errors_output:
-            print("⚠ Se encontraron errores previos, reutilizando...")
-            if isinstance(previous_errors_output, str):
-                previous_errors_output = extract_errors(previous_errors_output)  # Convertimos a diccionario si es string
-            errors = previous_errors_output or {}  # Si es None, inicializamos vacío
-            errors_processed = True  # Evita reutilizar errores más de una vez
-        else:
-            output = run_command(deploy_command)
-            print('🔹 Deployment output:', output)
-
-            extracted_errors = extract_errors(output) or {}  # Aseguramos que no sea None
-            print('🔹 Extracted errors:', extracted_errors)
-
-            # 🔹 Unimos errores previos y nuevos para asegurarnos de no perder ninguno
-            errors = {}
-
-            for key in error_patterns.keys():
-                prev_errors = previous_errors_output.get(key, set()) if isinstance(previous_errors_output, dict) else set()
-                new_errors = extracted_errors.get(key, set())
-
-                cleaned_errors = set()
-                for error in new_errors:
-                    match = re.search(error_patterns[key], error)
-                    if match:
-                        if key == 'field_specific':
-                            cleaned_errors.add((match.group(1), match.group(2)))
-                        else:
-                            cleaned_errors.add(match.group(1))
-
-                errors[key] = prev_errors.union(cleaned_errors)
-
-
-            save_errors_to_file(errors, errors_log_path)  # Guardamos los errores combinados
-            print('✅ Errores final combinados:', errors)  # Confirmación de los errores que se están guardando
-
-        action_taken = False
-
-        for key, items in errors.items():
-            for item in items:
-                print(f'Extracted {key}:', item)
-
-                for path in [profile_path, permission_set_path]:
-                    if key == 'field_specific':
-                        object_name, field_name = item
-                        delete_script = delete_script_templates['field_specific'].format(profile_path=path, object_name=object_name, field_name=field_name)
-                    elif key == 'object' and item.endswith('__mdt'):
-                        delete_script_fields = delete_script_templates['mdt_fields'].format(profile_path=path, object_name=item)
-                        delete_script_layouts = delete_script_templates['mdt_layouts'].format(profile_path=path, object_name=item)
-                        run_command(delete_script_fields)  # Ejecutamos después de definir ambos
-                        run_command(delete_script_layouts)
-                        continue  # Saltamos el resto para este caso
-                    elif key == 'custom_metadata_access':
-                        delete_script = delete_script_templates[key].format(profile_path=path, metadata_name=item)
-                    elif key == 'tab_visibility':  
-                        delete_script = delete_script_templates[key].format(profile_path=path, tab_name=item)
-                    elif key == 'fix_field_permissions':
-                        delete_script = delete_script_templates[key].format(profile_path=path)
-                    else:
-                        delete_script = delete_script_templates[key].format(profile_path=path, **{f'{key}_name': item})
-
-                    print(f'Running delete script for {key} at {path}...')
-                    delete_output = run_command(delete_script)
-                    print('Delete script output:', delete_output)
-
-                action_taken = True
-
-        if not action_taken:
-            print('No further action required.')
-            print('\a')  # Beep sound
-            fields_found = False
-
-
 def ejecutar_pre_push():
     #custom_labels_path = "force-app\\main\\default\\labels\\CustomLabels.labels-meta.xml"
-    #run_command(f'node C:\\Users\\aberdun\\Downloads\\rm\\Metadata Management\\Errors\\removeDuplicateLabels.mjs "{custom_labels_path}"')
+    #run_command(f'node C:\\Users\\Alejandro\\Downloads\\rm\\Metadata Management\\Errors\\removeDuplicateLabels.mjs "{custom_labels_path}"')
 
 
     """
@@ -789,61 +616,15 @@ def ejecutar_pre_push():
         current_branch = result.stdout.strip()
 
         # Detectar entorno basado en la rama
-        if "UAT2" in current_branch:
-            print("\nDetectado entorno UAT2. Ejecutando comandos para QA...")
-            if setDelta:
-                print("\nGenerando delta...")
-                comandos = [
-                "git fetch --all",
-                "sf sgd source delta --from $(git log --merges -n 1 --format='%H' origin/develop) --output-dir deploy-manifest --ignore-file .deltaignore --ignore-whitespace --source-dir force-app"
-            ]
-                for comando in comandos:
-                    print(f"Ejecutando: {comando}")
-                    result = subprocess.run(comando, shell=True, text=True)
-                    if result.returncode != 0:
-                        print(f"Error ejecutando el comando: {comando}")
-                        return
-
-                print("\nComandos ejecutados correctamente.")
-            
-            process_deploymentQA()
-
-        elif "PROD" in current_branch:
-            print("\nDetectado entorno PROD. Ejecutando comandos para PROD...")
-            if setDelta:
-                print("\nGenerando delta...")
-                comandos = [
-                "git fetch --all",
-                "sf sgd source delta --from $(git log --merges -n 1 --format='%H' origin/develop) --output-dir deploy-manifest --ignore-file .deltaignore --ignore-whitespace --source-dir force-app"
-            ]
-                for comando in comandos:
-                    print(f"Ejecutando: {comando}")
-                    result = subprocess.run(comando, shell=True, text=True)
-                    if result.returncode != 0:
-                        print(f"Error ejecutando el comando: {comando}")
-                        return
-
-                print("\nComandos ejecutados correctamente.")
-            process_deploymentPROD()
-
-        else:
-            print("\nLanzando contra otro...")
-            if setDelta:
-                print("\nGenerando delta...")
-                comandos = [
-                "git fetch --all",
-                "sf sgd source delta --from $(git log --merges -n 1 --format='%H' origin/develop) --output-dir deploy-manifest --ignore-file .deltaignore --ignore-whitespace --source-dir force-app"
-            ]
-                for comando in comandos:
-                    print(f"Ejecutando: {comando}")
-                    result = subprocess.run(comando, shell=True, text=True)
-                    if result.returncode != 0:
-                        print(f"Error ejecutando el comando: {comando}")
-                        return
-
-                print("\nComandos ejecutados correctamente.")
-            process_deploymentAnother()
-            return
+        if setDelta:
+            print("\nGenerando delta...")
+            comandos = [
+            "git fetch --all",
+            "sf sgd source delta --from $(git log --merges -n 1 --format='%H' origin/ci/mobility) --output-dir deploy-manifest --ignore-file .deltaignore --ignore-whitespace --source-dir force-app"
+        ]
+        
+        process_deploymentPROD()
+        return
 
     except Exception as e:
         print(f"Error en ejecutar_pre_push: {e}")
