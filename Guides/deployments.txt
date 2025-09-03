@@ -1,0 +1,2 @@
+Not in package.xml:
+Comprobar que fullname y el nombre del archivo coinciden. Se puede comparar la referencia del package.xml con el archivo.
