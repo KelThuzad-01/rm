@@ -2,4 +2,4 @@ Not in package.xml:
 Comprobar que fullname y el nombre del archivo coinciden. Se puede comparar la referencia del package.xml con el archivo.
 
 CustomMetadata  S3DX_TFObjectConfiguration.TFSalesAgreement  Your attempt to delete TFSalesAgreement could not be completed because it is associated with the following s3dx tfactionconfigurations.: TF_SalesAgreementActionAU:
-Comprobar en el entorno destino que no esté referenciado en el correspondiente custommetadata. Setup, custommetadata 
+Comprobar en el entorno destino que no esté referenciado en el correspondiente custommetadata. Setup, custommetadata

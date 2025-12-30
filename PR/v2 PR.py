@@ -4,7 +4,8 @@ from git import Repo
 from urllib.parse import unquote
 from colorama import Fore, Style, init
 import codecs
-#pip install GitPython; pip install colorama; pip install chardet
+#https://www.python.org/downloads/windows/
+#-m pip install GitPython colorama chardet
 
 init(autoreset=True)
 # Ruta al repositorio donde se harán los cherry-picks
