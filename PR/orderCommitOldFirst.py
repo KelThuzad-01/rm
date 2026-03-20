@@ -11,8 +11,8 @@ from datetime import datetime
 REPO_PATH = Path(r"C://Users//aberdun.SEIDORBCN//Downloads//ajbcn")
 
 MERGE_COMMITS = [
-    "57c4e38060624c1be90bef4f5006116f25baeb10",
-    "4dea48581349e9fb1be34d2363c3979c4b0b71cd",
+    "",
+    "",
 ]
 
 # ==============================
